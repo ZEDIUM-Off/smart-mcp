@@ -46,9 +46,10 @@ interface McpServerDetailPageProps {
 }
 
 export default function McpServerDetailPage({
-  params,
+  params: paramsPromise,
 }: McpServerDetailPageProps) {
-  const { uuid } = use(params);
+  const params = use(paramsPromise);
+  const { uuid } = params;
   const router = useRouter();
   const { t } = useTranslations();
 

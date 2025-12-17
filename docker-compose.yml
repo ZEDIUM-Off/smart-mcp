@@ -1,8 +1,12 @@
 services:
   app:
     container_name: metamcp
-    image: ghcr.io/metatool-ai/metamcp:latest
-    pull_policy: always
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # Comment these out to use remote image instead of local build:
+    # image: ghcr.io/metatool-ai/metamcp:latest
+    # pull_policy: always
     env_file:
       - .env
     ports:
@@ -27,6 +31,9 @@ services:
       
       # Docker networking fix
       TRANSFORM_LOCALHOST_TO_DOCKER_INTERNAL: ${TRANSFORM_LOCALHOST_TO_DOCKER_INTERNAL:-true}
+    volumes:
+      # Persist embedding model cache across restarts (~23MB model)
+      - model_cache:/home/nextjs/.cache
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
@@ -61,6 +68,8 @@ services:
 
 volumes:
   postgres_data:
+    driver: local
+  model_cache:
     driver: local
 
 networks:

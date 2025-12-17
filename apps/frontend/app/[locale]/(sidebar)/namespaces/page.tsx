@@ -6,7 +6,7 @@ import {
   CreateNamespaceRequest,
 } from "@repo/zod-types";
 import { ChevronDown, Package, Plus } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
@@ -26,6 +26,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useTranslations } from "@/hooks/useTranslations";
 import { trpc } from "@/lib/trpc";
@@ -34,9 +35,20 @@ import { createTranslatedZodResolver } from "@/lib/zod-resolver";
 import { NamespacesList } from "./namespaces-list";
 
 export default function NamespacesPage() {
-  const { t } = useTranslations();
+  const { t, isLoading, locale } = useTranslations();
   const [createOpen, setCreateOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (isLoading) return;
+    const labelKey = "namespaces:smartDiscoveryLabel";
+    const helpKey = "namespaces:smartDiscoveryHelp";
+    const labelValue = t(labelKey);
+    const helpValue = t(helpKey);
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/bd3e13fa-d7f5-4c87-8069-31f803e3bb51',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'D',location:'apps/frontend/app/[locale]/(sidebar)/namespaces/page.tsx:NamespacesPage',message:'Translations resolved for Smart Discovery label/help',data:{locale,labelKey,labelValue,helpKey,helpValue,labelLooksUntranslated:labelValue===labelKey,helpLooksUntranslated:helpValue===helpKey},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion agent log
+  }, [isLoading, locale]);
   const [selectedServerUuids, setSelectedServerUuids] = useState<string[]>([]);
 
   // Get the tRPC query client for cache invalidation
@@ -89,6 +101,8 @@ export default function NamespacesPage() {
       description: "",
       mcpServerUuids: [],
       user_id: undefined, // Default to "For myself" (Private)
+      smartDiscoveryEnabled: false,
+      smartDiscoveryDescription: "",
     },
   });
 
@@ -101,6 +115,7 @@ export default function NamespacesPage() {
         description: data.description,
         mcpServerUuids: selectedServerUuids,
         user_id: data.user_id,
+        smartDiscoveryDescription: data.smartDiscoveryDescription,
       };
 
       // Use tRPC mutation
@@ -218,6 +233,49 @@ export default function NamespacesPage() {
                   </DropdownMenu>
                 </div>
 
+                <div className="flex flex-row items-center justify-between rounded-lg border p-4">
+                  <div className="space-y-0.5">
+                    <label className="text-base font-medium">
+                      {t("namespaces:smartDiscoveryLabel") || "Smart Discovery"}
+                    </label>
+                    <div className="text-sm text-muted-foreground">
+                      {t("namespaces:smartDiscoveryHelp") ||
+                        "Enable semantic tool discovery for this namespace"}
+                    </div>
+                  </div>
+                  <Switch
+                    checked={form.watch("smartDiscoveryEnabled")}
+                    onCheckedChange={(checked) =>
+                      form.setValue("smartDiscoveryEnabled", checked)
+                    }
+                  />
+                </div>
+
+                {form.watch("smartDiscoveryEnabled") && (
+                  <div className="flex flex-col gap-2">
+                    <label
+                      htmlFor="smartDiscoveryDescription"
+                      className="text-sm font-medium"
+                    >
+                      {t("namespaces:smartDiscoveryDescriptionLabel") ||
+                        "Discovery Description"}
+                    </label>
+                    <Textarea
+                      id="smartDiscoveryDescription"
+                      {...form.register("smartDiscoveryDescription")}
+                      placeholder={
+                        t("namespaces:smartDiscoveryDescriptionPlaceholder") ||
+                        "Describe the tools in this namespace to help the agent find them..."
+                      }
+                      className="h-20"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {t("namespaces:smartDiscoveryDescriptionHelp") ||
+                        "This description will be used to guide the agent when searching for tools."}
+                    </p>
+                  </div>
+                )}
+
                 <div className="flex flex-col gap-2">
                   <label className="text-sm font-medium">
                     {t("namespaces:mcpServers")}
@@ -277,6 +335,8 @@ export default function NamespacesPage() {
                         name: "",
                         description: "",
                         user_id: undefined, // Default to "For myself" (Private)
+                        smartDiscoveryEnabled: false,
+                        smartDiscoveryDescription: "",
                       });
                       setSelectedServerUuids([]);
                     }}

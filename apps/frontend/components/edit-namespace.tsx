@@ -7,7 +7,7 @@ import {
   NamespaceWithServers,
   UpdateNamespaceRequest,
 } from "@repo/zod-types";
-import { Check, ChevronDown, Server } from "lucide-react";
+import { Check, ChevronDown, Server, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -28,6 +28,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useTranslations } from "@/hooks/useTranslations";
 import { trpc } from "@/lib/trpc";
@@ -78,6 +79,8 @@ export function EditNamespace({
           description: "",
           mcpServerUuids: [],
           user_id: undefined,
+          smartDiscoveryEnabled: false,
+          smartDiscoveryDescription: "",
         });
       } else {
         toast.error(t("namespaces:edit.updateFailed"), {
@@ -104,6 +107,8 @@ export function EditNamespace({
       description: "",
       mcpServerUuids: [],
       user_id: undefined,
+      smartDiscoveryEnabled: false,
+      smartDiscoveryDescription: "",
     },
   });
 
@@ -118,6 +123,8 @@ export function EditNamespace({
         description: namespace.description || "",
         mcpServerUuids: serverUuids,
         user_id: namespace.user_id,
+        smartDiscoveryEnabled: namespace.smart_discovery_enabled ?? false,
+        smartDiscoveryDescription: namespace.smart_discovery_description || "",
       });
       setSelectedServerUuids(serverUuids);
     }
@@ -149,6 +156,8 @@ export function EditNamespace({
         description: data.description,
         mcpServerUuids: selectedServerUuids,
         user_id: data.user_id,
+        smartDiscoveryEnabled: data.smartDiscoveryEnabled,
+        smartDiscoveryDescription: data.smartDiscoveryDescription,
       };
 
       // Use tRPC mutation instead of direct fetch
@@ -172,6 +181,8 @@ export function EditNamespace({
       description: "",
       mcpServerUuids: [],
       user_id: undefined,
+      smartDiscoveryEnabled: false,
+      smartDiscoveryDescription: "",
     });
     setSelectedServerUuids([]);
   };
@@ -261,6 +272,54 @@ export function EditNamespace({
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
+
+            {/* Smart Discovery Toggle */}
+            <div className="flex flex-row items-center justify-between rounded-lg border p-4">
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-primary" />
+                  <label className="text-sm font-medium cursor-pointer">
+                    {t("namespaces:edit.smartDiscoveryLabel")}
+                  </label>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {t("namespaces:edit.smartDiscoveryHelp")}
+                </p>
+              </div>
+              <Switch
+                checked={editForm.watch("smartDiscoveryEnabled") ?? false}
+                onCheckedChange={(checked) =>
+                  editForm.setValue("smartDiscoveryEnabled", checked)
+                }
+                disabled={isUpdating}
+              />
+            </div>
+
+            {editForm.watch("smartDiscoveryEnabled") && (
+              <div className="flex flex-col gap-2">
+                <label
+                  htmlFor="edit-smartDiscoveryDescription"
+                  className="text-sm font-medium"
+                >
+                  {t("namespaces:edit.smartDiscoveryDescriptionLabel") ||
+                    "Discovery Description"}
+                </label>
+                <Textarea
+                  id="edit-smartDiscoveryDescription"
+                  {...editForm.register("smartDiscoveryDescription")}
+                  placeholder={
+                    t("namespaces:edit.smartDiscoveryDescriptionPlaceholder") ||
+                    "Describe the tools in this namespace to help the agent find them..."
+                  }
+                  className="h-20"
+                  disabled={isUpdating}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {t("namespaces:edit.smartDiscoveryDescriptionHelp") ||
+                    "This description will be used to guide the agent when searching for tools."}
+                </p>
+              </div>
+            )}
 
             {/* MCP Servers Selection */}
             <div className="space-y-2">

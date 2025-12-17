@@ -46,6 +46,7 @@ export class EndpointsSerializer {
         created_at: dbEndpoint.namespace.created_at.toISOString(),
         updated_at: dbEndpoint.namespace.updated_at.toISOString(),
         user_id: dbEndpoint.namespace.user_id,
+        smart_discovery_enabled: dbEndpoint.namespace.smart_discovery_enabled,
       },
     };
   }

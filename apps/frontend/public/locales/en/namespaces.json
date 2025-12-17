@@ -210,6 +210,8 @@
     "noMcpServersAvailable": "No MCP servers available",
     "createMcpServersFirst": "Create some MCP servers first to add them to this namespace",
     "selectMcpServersHelp": "Select the MCP servers to include in this namespace. You can add or remove servers at any time.",
+    "smartDiscoveryLabel": "Smart Discovery (NCP Mode)",
+    "smartDiscoveryHelp": "When enabled, only a semantic 'find' tool is exposed. The LLM uses natural language queries to discover relevant tools on-demand, reducing token usage.",
     "cancel": "Cancel",
     "updateButton": "Update Namespace",
     "updating": "Updating...",

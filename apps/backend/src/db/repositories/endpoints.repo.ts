@@ -98,6 +98,7 @@ export class EndpointsRepository {
           description: namespacesTable.description,
           created_at: namespacesTable.created_at,
           updated_at: namespacesTable.updated_at,
+          smart_discovery_enabled: namespacesTable.smart_discovery_enabled,
           user_id: namespacesTable.user_id,
         },
       })
@@ -177,6 +178,7 @@ export class EndpointsRepository {
           name: namespacesTable.name,
           description: namespacesTable.description,
           created_at: namespacesTable.created_at,
+          smart_discovery_enabled: namespacesTable.smart_discovery_enabled,
           updated_at: namespacesTable.updated_at,
           user_id: namespacesTable.user_id,
         },
@@ -232,6 +234,7 @@ export class EndpointsRepository {
           uuid: namespacesTable.uuid,
           name: namespacesTable.name,
           description: namespacesTable.description,
+          smart_discovery_enabled: namespacesTable.smart_discovery_enabled,
           created_at: namespacesTable.created_at,
           updated_at: namespacesTable.updated_at,
           user_id: namespacesTable.user_id,

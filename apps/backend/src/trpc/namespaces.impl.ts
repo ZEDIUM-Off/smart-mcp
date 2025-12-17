@@ -30,6 +30,7 @@ import {
   clearOverrideCache,
   mapOverrideNameToOriginal,
 } from "../lib/metamcp/metamcp-middleware/tool-overrides.functional";
+import { clearSmartDiscoveryCache } from "../lib/metamcp/metamcp-middleware/smart-discovery.functional";
 import { metaMcpServerPool } from "../lib/metamcp/metamcp-server-pool";
 
 export const namespacesImplementations = {
@@ -87,6 +88,7 @@ export const namespacesImplementations = {
         description: input.description,
         mcpServerUuids: input.mcpServerUuids,
         user_id: effectiveUserId,
+        smart_discovery_enabled: input.smartDiscoveryEnabled ?? false,
       });
 
       // Ensure idle MetaMCP server exists for the new namespace to improve performance
@@ -383,6 +385,7 @@ export const namespacesImplementations = {
         description: input.description,
         user_id: input.user_id,
         mcpServerUuids: input.mcpServerUuids,
+        smart_discovery_enabled: input.smartDiscoveryEnabled,
       });
 
       // Invalidate idle MetaMCP server for this namespace since the MCP servers list may have changed
@@ -423,6 +426,14 @@ export const namespacesImplementations = {
       console.log(
         `Cleared tool overrides cache for updated namespace ${input.uuid}`,
       );
+
+      // Clear smart discovery cache if the setting changed
+      if (input.smartDiscoveryEnabled !== undefined) {
+        clearSmartDiscoveryCache(input.uuid);
+        console.log(
+          `Cleared smart discovery cache for updated namespace ${input.uuid}`,
+        );
+      }
 
       return {
         success: true as const,

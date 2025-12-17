@@ -19,6 +19,8 @@ services:
       - /app/packages/zod-types/node_modules
       - /app/packages/eslint-config/node_modules
       - /app/packages/typescript-config/node_modules
+      # Persist embedding model cache for Smart Discovery
+      - model_cache_dev:/root/.cache
     environment:
       # Postgres connection details
       POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
@@ -39,6 +41,9 @@ services:
       
       # Docker networking fix
       TRANSFORM_LOCALHOST_TO_DOCKER_INTERNAL: ${TRANSFORM_LOCALHOST_TO_DOCKER_INTERNAL:-true}
+      
+      # Package installer configuration
+      ENABLE_PACKAGE_INSTALLER: ${ENABLE_PACKAGE_INSTALLER:-true}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
@@ -73,6 +78,8 @@ services:
 
 volumes:
   postgres_data_dev:
+    driver: local
+  model_cache_dev:
     driver: local
 
 networks:

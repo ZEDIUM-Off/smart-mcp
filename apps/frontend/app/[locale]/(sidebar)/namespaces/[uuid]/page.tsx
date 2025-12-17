@@ -1,7 +1,7 @@
 "use client";
 
 import { McpServerTypeEnum } from "@repo/zod-types";
-import { ArrowLeft, Calendar, Edit, Hash, Plug, Server } from "lucide-react";
+import { ArrowLeft, Calendar, Edit, Hash, Plug, Server, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { notFound, useRouter } from "next/navigation";
 import { use, useEffect, useRef, useState } from "react";
@@ -33,9 +33,10 @@ interface NamespaceDetailPageProps {
 }
 
 export default function NamespaceDetailPage({
-  params,
+  params: paramsPromise,
 }: NamespaceDetailPageProps) {
-  const { uuid } = use(params);
+  const params = use(paramsPromise);
+  const { uuid } = params;
   const router = useRouter();
   const { t } = useTranslations();
 
@@ -494,6 +495,31 @@ export default function NamespaceDetailPage({
                 <div className="flex items-center gap-2 flex-1 ml-6 justify-end">
                   <Calendar className="h-3 w-3 text-muted-foreground" />
                   <p className="text-sm">{formatDate(namespace.updated_at)}</p>
+                </div>
+              </div>
+              <div className="flex justify-between items-start pt-2 border-t">
+                <div className="flex items-center gap-2 mt-1">
+                  <Sparkles className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-medium text-muted-foreground">
+                    {t("namespaces:detail.smartDiscovery")}:
+                  </span>
+                </div>
+                <div className="flex flex-col items-end flex-1 ml-6">
+                  <Badge
+                    variant={
+                      namespace.smart_discovery_enabled ? "default" : "outline"
+                    }
+                  >
+                    {namespace.smart_discovery_enabled
+                      ? t("namespaces:detail.enabled")
+                      : t("namespaces:detail.disabled")}
+                  </Badge>
+                  {namespace.smart_discovery_enabled &&
+                    namespace.smart_discovery_description && (
+                      <p className="text-xs text-muted-foreground text-right mt-1 max-w-[200px] truncate" title={namespace.smart_discovery_description}>
+                        {namespace.smart_discovery_description}
+                      </p>
+                    )}
                 </div>
               </div>
             </div>

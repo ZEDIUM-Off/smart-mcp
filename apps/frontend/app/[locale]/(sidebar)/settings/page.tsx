@@ -17,6 +17,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { PackageInstaller } from "@/components/package-installer";
 import { useTranslations } from "@/hooks/useTranslations";
 import { trpc } from "@/lib/trpc";
 
@@ -682,6 +683,8 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
       </form>
+
+      <PackageInstaller />
     </div>
   );
 }

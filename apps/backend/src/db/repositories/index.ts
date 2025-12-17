@@ -7,3 +7,4 @@ export * from "./oauth-sessions.repo";
 export * from "./oauth.repo";
 export * from "./api-keys.repo";
 export { configRepo } from "./config.repo";
+export * from "./package-installer.repo";

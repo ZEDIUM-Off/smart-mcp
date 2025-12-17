@@ -1,0 +1,1 @@
+ALTER TABLE "namespaces" ADD COLUMN "smart_discovery_description" text;

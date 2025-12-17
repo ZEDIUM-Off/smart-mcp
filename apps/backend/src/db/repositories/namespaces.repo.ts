@@ -27,6 +27,8 @@ export class NamespacesRepository {
           name: input.name,
           description: input.description,
           user_id: input.user_id,
+          smart_discovery_enabled: input.smart_discovery_enabled ?? false,
+          smart_discovery_description: input.smart_discovery_description,
         })
         .returning();
 
@@ -78,6 +80,8 @@ export class NamespacesRepository {
         created_at: namespacesTable.created_at,
         updated_at: namespacesTable.updated_at,
         user_id: namespacesTable.user_id,
+        smart_discovery_enabled: namespacesTable.smart_discovery_enabled,
+        smart_discovery_description: namespacesTable.smart_discovery_description,
       })
       .from(namespacesTable)
       .orderBy(desc(namespacesTable.created_at));
@@ -93,6 +97,8 @@ export class NamespacesRepository {
         created_at: namespacesTable.created_at,
         updated_at: namespacesTable.updated_at,
         user_id: namespacesTable.user_id,
+        smart_discovery_enabled: namespacesTable.smart_discovery_enabled,
+        smart_discovery_description: namespacesTable.smart_discovery_description,
       })
       .from(namespacesTable)
       .where(
@@ -114,6 +120,8 @@ export class NamespacesRepository {
         created_at: namespacesTable.created_at,
         updated_at: namespacesTable.updated_at,
         user_id: namespacesTable.user_id,
+        smart_discovery_enabled: namespacesTable.smart_discovery_enabled,
+        smart_discovery_description: namespacesTable.smart_discovery_description,
       })
       .from(namespacesTable)
       .where(isNull(namespacesTable.user_id))
@@ -130,6 +138,8 @@ export class NamespacesRepository {
         created_at: namespacesTable.created_at,
         updated_at: namespacesTable.updated_at,
         user_id: namespacesTable.user_id,
+        smart_discovery_enabled: namespacesTable.smart_discovery_enabled,
+        smart_discovery_description: namespacesTable.smart_discovery_description,
       })
       .from(namespacesTable)
       .where(eq(namespacesTable.user_id, userId))
@@ -145,6 +155,8 @@ export class NamespacesRepository {
         created_at: namespacesTable.created_at,
         updated_at: namespacesTable.updated_at,
         user_id: namespacesTable.user_id,
+        smart_discovery_enabled: namespacesTable.smart_discovery_enabled,
+        smart_discovery_description: namespacesTable.smart_discovery_description,
       })
       .from(namespacesTable)
       .where(eq(namespacesTable.uuid, uuid));
@@ -165,6 +177,8 @@ export class NamespacesRepository {
         created_at: namespacesTable.created_at,
         updated_at: namespacesTable.updated_at,
         user_id: namespacesTable.user_id,
+        smart_discovery_enabled: namespacesTable.smart_discovery_enabled,
+        smart_discovery_description: namespacesTable.smart_discovery_description,
       })
       .from(namespacesTable)
       .where(
@@ -288,15 +302,34 @@ export class NamespacesRepository {
 
   async update(input: NamespaceUpdateInput): Promise<DatabaseNamespace> {
     return await db.transaction(async (tx) => {
+      // Build the update object, only including smart_discovery_enabled if provided
+      const updateData: {
+        name: string;
+        description: string | null | undefined;
+        user_id: string | null | undefined;
+        updated_at: Date;
+        smart_discovery_enabled?: boolean;
+        smart_discovery_description?: string | null;
+      } = {
+        name: input.name,
+        description: input.description,
+        user_id: input.user_id,
+        updated_at: new Date(),
+      };
+
+      // Only update smart_discovery_enabled if explicitly provided
+      if (input.smart_discovery_enabled !== undefined) {
+        updateData.smart_discovery_enabled = input.smart_discovery_enabled;
+      }
+
+      if (input.smart_discovery_description !== undefined) {
+        updateData.smart_discovery_description = input.smart_discovery_description;
+      }
+
       // Update the namespace
       const [updatedNamespace] = await tx
         .update(namespacesTable)
-        .set({
-          name: input.name,
-          description: input.description,
-          user_id: input.user_id,
-          updated_at: new Date(),
-        })
+        .set(updateData)
         .where(eq(namespacesTable.uuid, input.uuid))
         .returning();
 

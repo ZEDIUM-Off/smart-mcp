@@ -70,7 +70,10 @@ export function InspectorTools({
   const [nextCursor, setNextCursor] = useState<string | undefined>();
 
   // Fetch available tools with proper error handling pattern from official inspector
-  const fetchTools = async (cursor?: string) => {
+  const fetchTools = async (
+    cursor?: string,
+    options?: { silent?: boolean; replace?: boolean },
+  ) => {
     if (!enabled) {
       toast.warning(t("inspector:toolsComponent.toolsNotSupportedWarning"));
       return;
@@ -87,29 +90,39 @@ export function InspectorTools({
         { suppressToast: true },
       );
 
+      const replace = options?.replace ?? !cursor;
+      const nextTools = response.tools || [];
+
       if (cursor) {
         // Append to existing tools if we're fetching more
-        setTools((prev) => [...prev, ...(response.tools || [])]);
+        setTools((prev) => [...prev, ...nextTools]);
       } else {
         // Replace tools if this is the first fetch
-        setTools(response.tools || []);
+        setTools(nextTools);
+        // If the previously selected tool no longer exists, auto-select the first tool.
+        if (
+          selectedTool &&
+          nextTools.length > 0 &&
+          !nextTools.some((t) => t.name === selectedTool.name)
+        ) {
+          // @ts-expect-error TODO resolve MCP SDK Tool schema mismatch
+          setSelectedTool(nextTools[0]);
+        }
       }
 
       setNextCursor(response.nextCursor);
 
-      if (response.tools && response.tools.length > 0) {
-        toast.success(
-          t("inspector:toolsComponent.foundTools", {
-            count: response.tools.length,
-          }),
-        );
+      if (!options?.silent && nextTools.length > 0) {
+        toast.success(t("inspector:toolsComponent.foundTools", { count: nextTools.length }));
         // Auto-select first tool if none selected
-        if (!selectedTool && response.tools.length > 0) {
+        if (!selectedTool && nextTools.length > 0) {
           // @ts-expect-error TODO resolve MCP SDK Tool schema mismatch
-          setSelectedTool(response.tools[0]);
+          setSelectedTool(nextTools[0]);
         }
       } else {
-        toast.info(t("inspector:toolsComponent.noToolsFound"));
+        if (!options?.silent) {
+          toast.info(t("inspector:toolsComponent.noToolsFound"));
+        }
       }
     } catch (error) {
       console.error("Error listing tools:", error);
@@ -270,6 +283,14 @@ export function InspectorTools({
           ),
         },
       );
+
+      // If this was a Smart Discovery find, refresh the tool list so newly discovered
+      // tools appear (and undiscovered ones disappear) without manual reload.
+      if (selectedTool.name === "metamcp__find") {
+        setNextCursor(undefined);
+        setTools([]);
+        await fetchTools(undefined, { silent: true, replace: true });
+      }
     } catch (error) {
       const duration = Date.now() - startTime;
       const errorString =

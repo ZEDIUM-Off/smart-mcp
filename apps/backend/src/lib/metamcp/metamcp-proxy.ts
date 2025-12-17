@@ -42,6 +42,10 @@ import {
   createToolOverridesListToolsMiddleware,
   mapOverrideNameToOriginal,
 } from "./metamcp-middleware/tool-overrides.functional";
+import {
+  createSmartDiscoveryCallToolMiddleware,
+  createSmartDiscoveryListToolsMiddleware,
+} from "./metamcp-middleware/smart-discovery.functional";
 import { parseToolName } from "./tool-name-parser";
 import { sanitizeName } from "./utils";
 
@@ -447,7 +451,10 @@ export const createServer = async (
   };
 
   // Compose middleware with handlers - this is the Express-like functional approach
+  // Smart Discovery middleware should be LAST (outermost) so it sees filtered/overridden tools
+  // but can replace the response when smart discovery is enabled
   const listToolsWithMiddleware = compose(
+    createSmartDiscoveryListToolsMiddleware({ cacheEnabled: true }),
     createToolOverridesListToolsMiddleware({
       cacheEnabled: true,
       persistentCacheOnListTools: true,
@@ -458,7 +465,9 @@ export const createServer = async (
     // createRateLimitingMiddleware(),
   )(originalListToolsHandler);
 
+  // Smart Discovery call middleware should be FIRST to intercept "find" tool calls
   const callToolWithMiddleware = compose(
+    createSmartDiscoveryCallToolMiddleware({ cacheEnabled: true }),
     createFilterCallToolMiddleware({
       cacheEnabled: true,
       customErrorMessage: (toolName, reason) =>

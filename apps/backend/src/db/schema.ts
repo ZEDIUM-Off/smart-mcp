@@ -219,6 +219,13 @@ export const namespacesTable = pgTable(
     uuid: uuid("uuid").primaryKey().defaultRandom(),
     name: text("name").notNull(),
     description: text("description"),
+    // Smart Discovery (NCP-style): when enabled, only expose a "find" tool
+    // that semantically discovers relevant tools on-demand
+    smart_discovery_enabled: boolean("smart_discovery_enabled")
+      .notNull()
+      .default(false),
+    // Custom description for the "find" tool prompt
+    smart_discovery_description: text("smart_discovery_description"),
     created_at: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -473,3 +480,19 @@ export const oauthAccessTokensTable = pgTable(
     index("oauth_access_tokens_expires_at_idx").on(table.expires_at),
   ],
 );
+// ... existing code ...
+
+export const packageInstallHistoryTable = pgTable("package_install_history", {
+  uuid: uuid("uuid").primaryKey().defaultRandom(),
+  manager: text("manager").notNull(),
+  package_name: text("package_name").notNull(),
+  command: text("command").notNull(),
+  output: text("output"),
+  status: text("status").notNull(), // "success" | "failure"
+  created_at: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  user_id: text("user_id").references(() => usersTable.id, {
+    onDelete: "set null",
+  }),
+});

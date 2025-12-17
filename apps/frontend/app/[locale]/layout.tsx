@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { ReactNode } from "react";
 
 import { SUPPORTED_LOCALES, SupportedLocale } from "../../lib/i18n";
+import { DebugConsoleHook } from "../../components/debug-console-hook";
 
 interface LocaleLayoutProps {
   children: ReactNode;
@@ -19,5 +20,10 @@ export default async function LocaleLayout({
     notFound();
   }
 
-  return <div lang={locale}>{children}</div>;
+  return (
+    <div lang={locale}>
+      <DebugConsoleHook />
+      {children}
+    </div>
+  );
 }
