@@ -8,6 +8,7 @@ import { use, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { EditNamespace } from "@/components/edit-namespace";
+import { usePageHeader } from "@/components/page-header-context";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,6 +22,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useConnection } from "@/hooks/useConnection";
 import { useTranslations } from "@/hooks/useTranslations";
+import { getLocalizedPath } from "@/lib/i18n";
 import { trpc } from "@/lib/trpc";
 
 import { NamespaceServersTable } from "./components/namespace-servers-table";
@@ -38,7 +40,8 @@ export default function NamespaceDetailPage({
   const params = use(paramsPromise);
   const { uuid } = params;
   const router = useRouter();
-  const { t } = useTranslations();
+  const { t, locale } = useTranslations();
+  const { setHeader, clearHeader } = usePageHeader();
 
   const [showDeleteDialog, setShowDeleteDialog] = useState<boolean>(false);
   const [editDialogOpen, setEditDialogOpen] = useState<boolean>(false);
@@ -104,7 +107,28 @@ export default function NamespaceDetailPage({
       console.log("MetaMCP Notification:", notification);
     },
     onStdErrNotification: (notification) => {
-      console.error("MetaMCP StdErr:", notification);
+      // Extract content from stderr notification
+      const content = (notification as any)?.params?.content;
+      if (content) {
+        // Filter out informational messages that are not actual errors
+        const isInformational = 
+          content.includes("running on") ||
+          content.includes("Server running") ||
+          content.includes("listening on") ||
+          content.trim().length === 0;
+        
+        if (isInformational) {
+          // Log informational stderr messages as debug info, not errors
+          console.debug("MetaMCP Server Info:", content.trim());
+        } else {
+          // Log actual error messages
+          console.warn("MetaMCP StdErr:", content);
+        }
+      } else if (notification && Object.keys(notification).length > 0) {
+        // Log the full notification if content is missing but notification exists
+        console.warn("MetaMCP StdErr (raw):", JSON.stringify(notification, null, 2));
+      }
+      // Silently ignore empty notifications to avoid console noise
     },
     enabled: Boolean(namespace && !isLoading),
   });
@@ -120,6 +144,90 @@ export default function NamespaceDetailPage({
       connection.connect();
     }
   }, [namespace, connection, isLoading]);
+
+  useEffect(() => {
+    const title = namespace?.name || t("common:loading");
+    const description =
+      namespace?.description || t("namespaces:noDescription");
+
+    const connectionStatus = connection.connectionStatus;
+    const connectionText =
+      connectionStatus === "connected"
+        ? t("namespaces:detail.connected")
+        : connectionStatus === "disconnected"
+          ? t("namespaces:detail.disconnected")
+          : connectionStatus === "error" ||
+              connectionStatus === "error-connecting-to-proxy"
+            ? t("namespaces:detail.connectionError")
+            : t("namespaces:detail.connecting");
+
+    const ConnectionIcon =
+      connectionStatus === "connected" ||
+      connectionStatus === "disconnected" ||
+      connectionStatus === "connecting"
+        ? Plug
+        : Server;
+
+    setHeader({
+      title,
+      description,
+      icon: <Sparkles className="h-5 w-5" />,
+      actions: (
+        <>
+          <Link href={getLocalizedPath("/namespaces", locale)}>
+            <Button variant="ghost" size="sm">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              {t("namespaces:detail.backToNamespaces")}
+            </Button>
+          </Link>
+
+          <div className="hidden md:flex items-center gap-2 px-2">
+            <span className="text-sm font-medium">
+              {t("namespaces:detail.metaMcpConnection")}:
+            </span>
+            <ConnectionIcon className="h-4 w-4" />
+            <span className="text-sm font-medium">{connectionText}</span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleConnectionToggle}
+              disabled={connectionStatus === "connecting"}
+            >
+              {connectionStatus === "connected"
+                ? t("namespaces:detail.reconnect")
+                : t("namespaces:detail.connect")}
+            </Button>
+          </div>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setEditDialogOpen(true)}
+          >
+            <Edit className="h-4 w-4 mr-2" />
+            {t("namespaces:editNamespace")}
+          </Button>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => setShowDeleteDialog(true)}
+          >
+            {t("namespaces:deleteNamespace")}
+          </Button>
+        </>
+      ),
+    });
+
+    return () => clearHeader();
+  }, [
+    clearHeader,
+    connection.connectionStatus,
+    locale,
+    namespace?.description,
+    namespace?.name,
+    setHeader,
+    t,
+  ]);
 
   // Handle delete namespace
   const handleDeleteNamespace = async () => {
@@ -338,38 +446,8 @@ export default function NamespaceDetailPage({
     notFound();
   }
 
-  const connectionInfo = getConnectionStatusInfo();
-  const ConnectionIcon = connectionInfo.icon;
-
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <Link href="/namespaces">
-          <Button variant="ghost" size="sm">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            {t("namespaces:detail.backToNamespaces")}
-          </Button>
-        </Link>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setEditDialogOpen(true)}
-          >
-            <Edit className="h-4 w-4 mr-2" />
-            {t("namespaces:editNamespace")}
-          </Button>
-          <Button
-            variant="destructive"
-            size="sm"
-            onClick={() => setShowDeleteDialog(true)}
-          >
-            {t("namespaces:deleteNamespace")}
-          </Button>
-        </div>
-      </div>
-
       {/* Edit Namespace Dialog */}
       <EditNamespace
         namespace={namespace}
@@ -412,41 +490,6 @@ export default function NamespaceDetailPage({
 
       {/* Namespace Info */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">
-              {namespace.name}
-            </h1>
-            {namespace.description && (
-              <p className="text-muted-foreground mt-1">
-                {namespace.description}
-              </p>
-            )}
-          </div>
-          <div className="flex items-center space-x-4">
-            {/* MetaMCP Connection Status */}
-            <div className="flex items-center space-x-2">
-              <span className="text-sm font-medium">
-                {t("namespaces:detail.metaMcpConnection")}:
-              </span>
-              <ConnectionIcon className="h-4 w-4" />
-              <span className={`text-sm font-medium ${connectionInfo.color}`}>
-                {connectionInfo.text}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleConnectionToggle}
-                disabled={connection.connectionStatus === "connecting"}
-              >
-                {connection.connectionStatus === "connected"
-                  ? t("namespaces:detail.reconnect")
-                  : t("namespaces:detail.connect")}
-              </Button>
-            </div>
-          </div>
-        </div>
-
         {/* Section 1: Basic Overview */}
         <div className="grid gap-6 md:grid-cols-2">
           {/* Basic Information */}
@@ -597,6 +640,7 @@ export default function NamespaceDetailPage({
           </h3>
           {connection.connectionStatus === "connected" ? (
             <NamespaceToolManagement
+              namespace={namespace}
               servers={namespace.servers}
               namespaceUuid={namespace.uuid}
               makeRequest={connection.makeRequest}
@@ -604,6 +648,7 @@ export default function NamespaceDetailPage({
           ) : (
             <div className="space-y-4">
               <NamespaceToolManagement
+                namespace={namespace}
                 servers={namespace.servers}
                 namespaceUuid={namespace.uuid}
               />

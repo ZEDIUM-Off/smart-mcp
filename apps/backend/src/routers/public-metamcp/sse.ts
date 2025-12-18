@@ -9,6 +9,7 @@ import {
 import { lookupEndpoint } from "@/middleware/lookup-endpoint-middleware";
 
 import { metaMcpServerPool } from "../../lib/metamcp/metamcp-server-pool";
+import { liveConnectionsTracker } from "../../lib/metamcp/live-connections-tracker";
 import { SessionLifetimeManagerImpl } from "../../lib/session-lifetime-manager";
 
 const sseRouter = express.Router();
@@ -84,11 +85,21 @@ sseRouter.get(
 
       sessionManager.addSession(sessionId, webAppTransport);
 
+      // Track live connection
+      liveConnectionsTracker.addConnection(
+        sessionId,
+        endpointName,
+        namespaceUuid,
+        "SSE",
+      );
+
       // Handle cleanup when connection closes
       res.on("close", async () => {
         console.log(
           `Public endpoint SSE connection closed for session ${sessionId}`,
         );
+        // Remove from tracker before cleanup
+        liveConnectionsTracker.removeConnection(sessionId);
         await cleanupSession(sessionId);
       });
 
@@ -131,6 +142,8 @@ sseRouter.post(
 
 // Initialize automatic cleanup timer using session manager
 sessionManager.startCleanupTimer(async (sessionId, transport) => {
+  // Remove from tracker before cleanup
+  liveConnectionsTracker.removeConnection(sessionId);
   await cleanupSession(sessionId, transport);
 });
 

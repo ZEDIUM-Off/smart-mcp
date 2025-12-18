@@ -7,6 +7,7 @@ import helmet from "helmet";
 import { createContext } from "../trpc";
 import { apiKeysImplementations } from "../trpc/api-keys.impl";
 import { configImplementations } from "../trpc/config.impl";
+import { dashboardImplementations } from "../trpc/dashboard.impl";
 import { endpointsImplementations } from "../trpc/endpoints.impl";
 import { logsImplementations } from "../trpc/logs.impl";
 import { mcpServersImplementations } from "../trpc/mcp-servers.impl";
@@ -27,6 +28,7 @@ const appRouter = createAppRouter({
     config: configImplementations,
     logs: logsImplementations,
     packageInstaller: packageInstallerImplementations,
+    dashboard: dashboardImplementations,
   },
 });
 

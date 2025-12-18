@@ -4,7 +4,7 @@ import {
   ClientRequest,
   ListToolsResultSchema,
 } from "@modelcontextprotocol/sdk/types.js";
-import { ToolStatusEnum } from "@repo/zod-types";
+import { NamespaceWithServers, ToolStatusEnum } from "@repo/zod-types";
 import { AlertTriangle, Database, RefreshCw, Wrench } from "lucide-react";
 import React, { useCallback, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -18,6 +18,7 @@ import { trpc } from "@/lib/trpc";
 import { EnhancedNamespaceToolsTable } from "./enhanced-namespace-tools-table";
 
 interface NamespaceToolManagementProps {
+  namespace: NamespaceWithServers;
   servers: Array<{
     uuid: string;
     name: string;
@@ -33,6 +34,7 @@ interface NamespaceToolManagementProps {
 }
 
 export function NamespaceToolManagement({
+  namespace,
   servers,
   namespaceUuid,
   makeRequest,
@@ -150,10 +152,20 @@ export function NamespaceToolManagement({
             setIsAutoSaving(true);
 
             // Submit the tools for update to namespace tool mapping records
-            refreshToolsMutation.mutate({
-              namespaceUuid,
-              tools: toolsForSubmission,
-            });
+            refreshToolsMutation.mutate(
+              {
+                namespaceUuid,
+                tools: toolsForSubmission,
+              },
+              {
+                onError: (error) => {
+                  console.error("Failed to auto-save tools:", error);
+                  setIsAutoSaving(false);
+                  // Don't show error toast for auto-save failures to avoid noise
+                  // User can manually refresh if needed
+                },
+              },
+            );
           } else if (autoSave) {
             // Auto-save requested but no tools found - this is fine
           } else {
@@ -381,6 +393,7 @@ export function NamespaceToolManagement({
       {savedToolCount > 0 || mcpToolCount > 0 ? (
         <div className="rounded-lg border">
           <EnhancedNamespaceToolsTable
+            namespace={namespace}
             savedTools={namespaceTools}
             mcpTools={mcpTools}
             loading={false} // We handle loading state above

@@ -89,7 +89,10 @@
     "toggleTooFast": "Toggle Too Fast",
     "toggleTooFastDescription": "Please wait before toggling again to allow the session to initialize properly.",
     "forceReset": "Force Reset",
-    "anErrorOccurredWhileDeleting": "An error occurred while deleting the namespace"
+    "anErrorOccurredWhileDeleting": "An error occurred while deleting the namespace",
+    "smartDiscovery": "Smart Discovery",
+    "enabled": "Enabled",
+    "disabled": "Disabled"
   },
   "enhancedToolsTable": {
     "toolName": "Tool Name",
@@ -151,6 +154,18 @@
     "autoSaving": "Auto-saving...",
     "active": "ACTIVE",
     "inactive": "INACTIVE",
+    "pinTool": "Expose by default (Pin)",
+    "unpinTool": "Unpin (stop exposing by default)",
+    "pinnedBadge": "Pinned",
+    "pinnedTooltip": "Exposed by default when Smart Discovery is enabled",
+    "pinsUpdated": "Pinned tools updated",
+    "pinsUpdateFailed": "Failed to update pinned tools",
+    "enableSmartDiscoveryToPin": "Enable Smart Discovery to pin tools",
+    "sections": {
+      "pinned": "Pinned ({{count}})",
+      "discovered": "Smart Discovery ({{count}})",
+      "fromServers": "From servers ({{count}})"
+    },
     "editOverrides": "Edit Overrides"
   },
   "serversTable": {
@@ -197,6 +212,11 @@
     "metaMCPNotAvailable": "MetaMCP connection not available, falling back to database refresh",
     "toolsAutoSaved": "Tools automatically discovered and saved"
   },
+  "smartDiscoveryLabel": "Smart Discovery",
+  "smartDiscoveryHelp": "Enable semantic tool discovery for this namespace. When enabled, only a semantic 'find' tool is exposed. The LLM uses natural language queries to discover relevant tools on-demand, reducing token usage.",
+  "smartDiscoveryDescriptionLabel": "Discovery Description",
+  "smartDiscoveryDescriptionPlaceholder": "Describe the tools in this namespace to help the agent find them...",
+  "smartDiscoveryDescriptionHelp": "This description will be used to guide the agent when searching for tools.",
   "edit": {
     "title": "Edit Namespace",
     "description": "Update the namespace name, description, and manage MCP server associations.",

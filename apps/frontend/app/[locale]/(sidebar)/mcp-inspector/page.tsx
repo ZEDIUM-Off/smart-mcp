@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import React, { Suspense, useMemo, useState } from "react";
 
 import { EditMcpServer } from "@/components/edit-mcp-server";
+import { usePageHeader } from "@/components/page-header-context";
 import { InspectorSkeleton } from "@/components/skeletons/inspector-skeleton";
 import { Button } from "@/components/ui/button";
 import {
@@ -37,6 +38,7 @@ function McpInspectorContent() {
   const [notifications, setNotifications] = useState<NotificationEntry[]>([]);
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { setHeader, clearHeader } = usePageHeader();
 
   // Get selectedServerUuid directly from search params
   const selectedServerUuid = searchParams.get("server") || "";
@@ -183,22 +185,18 @@ function McpInspectorContent() {
     router.replace(`/mcp-inspector?${params.toString()}`);
   });
 
+  React.useEffect(() => {
+    setHeader({
+      title: t("inspector:title"),
+      description: t("inspector:subtitle"),
+      icon: <SearchCode className="h-5 w-5" />,
+    });
+    return () => clearHeader();
+  }, [clearHeader, setHeader, t]);
+
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="space-y-4">
-        <div className="flex items-center gap-3">
-          <SearchCode className="h-8 w-8 text-primary" />
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">
-              {t("inspector:title")}
-            </h1>
-            <p className="text-muted-foreground">{t("inspector:subtitle")}</p>
-          </div>
-        </div>
-
-        <Separator />
-
         {/* MCP Server Selection */}
         <div className="flex items-center gap-4">
           <span className="text-sm font-medium">
@@ -270,9 +268,7 @@ function McpInspectorContent() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() =>
-                  router.push(`/mcp-servers/${selectedServerUuid}`)
-                }
+                onClick={() => router.push(`/mcp-servers/${selectedServerUuid}`)}
               >
                 <Eye className="h-4 w-4 mr-2" />
                 {t("mcp-servers:list.viewDetails")}
@@ -288,6 +284,7 @@ function McpInspectorContent() {
             </div>
           )}
         </div>
+        <Separator />
       </div>
 
       {/* Edit Server Dialog */}

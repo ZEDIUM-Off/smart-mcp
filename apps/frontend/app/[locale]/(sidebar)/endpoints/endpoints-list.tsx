@@ -52,6 +52,7 @@ import {
 } from "@/components/ui/table";
 import { useTranslations } from "@/hooks/useTranslations";
 import { getAppUrl } from "@/lib/env";
+import { generateCursorMcpInstallLink } from "@/lib/cursor-deeplink";
 import { trpc } from "@/lib/trpc";
 
 interface EndpointsListProps {
@@ -271,7 +272,7 @@ export function EndpointsList({ onRefresh }: EndpointsListProps) {
         const isPublic = endpoint.user_id === null;
         return (
           <div className="py-2">
-            <Badge variant={isPublic ? "success" : "neutral"}>
+            <Badge variant={isPublic ? "default" : "secondary"}>
               {isPublic ? t("endpoints:public") : t("endpoints:private")}
             </Badge>
           </div>
@@ -362,6 +363,49 @@ export function EndpointsList({ onRefresh }: EndpointsListProps) {
           toast.success(t("endpoints:list.openApiSchemaUrlWithApiKeyCopied"));
         };
 
+        const handleAddToCursor = () => {
+          const apiKey = getApiKey();
+          const serverName = endpoint.name;
+
+          let sseUrl: string;
+          let headers: Record<string, string> | undefined;
+
+          if (endpoint.use_query_param_auth) {
+            // Use query parameter authentication
+            sseUrl = `${getAppUrl()}/metamcp/${endpoint.name}/sse?api_key=${apiKey}`;
+          } else {
+            // Use Bearer token in headers
+            sseUrl = `${getAppUrl()}/metamcp/${endpoint.name}/sse`;
+            if (apiKey && apiKey !== "YOUR_API_KEY") {
+              headers = {
+                Authorization: `Bearer ${apiKey}`,
+              };
+            }
+          }
+
+          try {
+            const deeplink = generateCursorMcpInstallLink(serverName, {
+              url: sseUrl,
+              ...(headers && { headers }),
+            });
+
+            // Copy to clipboard
+            navigator.clipboard.writeText(deeplink);
+
+            // Also try to open the deeplink (will work if Cursor is installed)
+            window.location.href = deeplink;
+
+            toast.success(t("endpoints:list.addToCursorCopied"), {
+              description: t("endpoints:list.addToCursorDescription"),
+            });
+          } catch (error) {
+            console.error("Error generating Cursor deeplink:", error);
+            toast.error(t("endpoints:list.addToCursorError"), {
+              description: error instanceof Error ? error.message : "Unknown error",
+            });
+          }
+        };
+
         return (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -396,6 +440,10 @@ export function EndpointsList({ onRefresh }: EndpointsListProps) {
               <DropdownMenuItem onClick={copyFullOpenApiSchemaUrl}>
                 <Link className="mr-2 h-4 w-4" />
                 {t("endpoints:list.copyOpenApiSchemaUrl")}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleAddToCursor}>
+                <Package className="mr-2 h-4 w-4" />
+                {t("endpoints:list.addToCursor")}
               </DropdownMenuItem>
               {endpoint.use_query_param_auth && (
                 <>
@@ -508,7 +556,7 @@ export function EndpointsList({ onRefresh }: EndpointsListProps) {
           <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder={t("endpoints:list.searchPlaceholder")}
-            value={globalFilter || ""}
+            value={typeof globalFilter === "string" ? globalFilter : ""}
             onChange={(event) => setGlobalFilter(event.target.value || "")}
             className="pl-8"
           />

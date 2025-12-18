@@ -13,6 +13,7 @@ import {
   CheckCircle,
   Clock,
   Code,
+  Copy,
   Loader2,
   Play,
   Wrench,
@@ -25,6 +26,7 @@ import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { CodeBlock } from "@/components/ui/code-block";
 import { Input } from "@/components/ui/input";
+import { Markdown } from "@/components/markdown";
 import { Textarea } from "@/components/ui/textarea";
 import { useTranslations } from "@/hooks/useTranslations";
 
@@ -121,7 +123,7 @@ export function InspectorTools({
         }
       } else {
         if (!options?.silent) {
-          toast.info(t("inspector:toolsComponent.noToolsFound"));
+        toast.info(t("inspector:toolsComponent.noToolsFound"));
         }
       }
     } catch (error) {
@@ -354,6 +356,41 @@ export function InspectorTools({
     }
   };
 
+  // Parse metamcp__find result
+  const parseFindResult = (result: CompatibilityCallToolResult) => {
+    try {
+      if (result.content && Array.isArray(result.content)) {
+        for (const contentItem of result.content) {
+          if (contentItem.type === "text" && typeof contentItem.text === "string") {
+            const parsed = JSON.parse(contentItem.text);
+            if (parsed.tools && Array.isArray(parsed.tools)) {
+              return {
+                message: parsed.message,
+                query: parsed.query,
+                tools: parsed.tools,
+              };
+            }
+          }
+        }
+      }
+    } catch (error) {
+      // Not a valid find result, return null
+    }
+    return null;
+  };
+
+  const copyToolCall = (tool: {
+    name: string;
+    arguments?: Record<string, unknown>;
+  }) => {
+    const toolCall = {
+      name: tool.name,
+      arguments: tool.arguments || {},
+    };
+    navigator.clipboard.writeText(JSON.stringify(toolCall, null, 2));
+    toast.success(t("inspector:toolsComponent.toolCallCopied"));
+  };
+
   // Check if tools capability is disabled
   if (!enabled) {
     return (
@@ -455,13 +492,13 @@ export function InspectorTools({
                   {t("inspector:toolsComponent.toolDetails")}
                 </h6>
                 <div className="rounded-lg border p-3">
-                  <div className="font-mono text-sm mb-1">
+                  <div className="font-mono text-sm mb-2">
                     {selectedTool.name}
                   </div>
                   {selectedTool.description && (
-                    <p className="text-xs text-muted-foreground">
+                    <Markdown className="text-xs">
                       {selectedTool.description}
-                    </p>
+                    </Markdown>
                   )}
                 </div>
               </div>
@@ -599,13 +636,100 @@ export function InspectorTools({
                       <div className="text-xs font-medium text-muted-foreground mb-1">
                         {t("inspector:toolsComponent.result")}:
                       </div>
-                      <CodeBlock
-                        language="json"
-                        maxHeight="200px"
-                        className="text-xs"
-                      >
-                        {JSON.stringify(execution.result, null, 2)}
-                      </CodeBlock>
+                      {execution.toolName === "metamcp__find" ? (
+                        (() => {
+                          const findResult = parseFindResult(execution.result);
+                          if (findResult) {
+                            return (
+                              <div className="space-y-3">
+                                {findResult.message && (
+                                  <p className="text-xs text-muted-foreground">
+                                    {findResult.message}
+                                  </p>
+                                )}
+                                {findResult.query && (
+                                  <p className="text-xs text-muted-foreground">
+                                    <strong>Query:</strong> {findResult.query}
+                                  </p>
+                                )}
+                                {findResult.tools && findResult.tools.length > 0 && (
+                                  <div className="space-y-2">
+                                    <div className="text-xs font-medium text-muted-foreground">
+                                      Found {findResult.tools.length} tool(s):
+                                    </div>
+                                    {findResult.tools.map((tool: any, idx: number) => (
+                                      <div
+                                        key={idx}
+                                        className="rounded-lg border p-3 space-y-2"
+                                      >
+                                        <div className="flex items-start justify-between">
+                                          <div className="flex-1">
+                                            <div className="font-mono text-xs font-medium mb-1">
+                                              {tool.name}
+                                            </div>
+                                            {tool.description && (
+                                              <p className="text-xs text-muted-foreground mb-2">
+                                                {tool.description}
+                                              </p>
+                                            )}
+                                            {tool.relevanceScore !== undefined && (
+                                              <div className="text-xs text-muted-foreground mb-2">
+                                                Relevance:{" "}
+                                                {(tool.relevanceScore * 100).toFixed(0)}%
+                                              </div>
+                                            )}
+                                          </div>
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-6 px-2"
+                                            onClick={() => copyToolCall(tool)}
+                                          >
+                                            <Copy className="h-3 w-3 mr-1" />
+                                            Copy
+                                          </Button>
+                                        </div>
+                                        {tool.arguments && (
+                                          <div>
+                                            <div className="text-xs font-medium text-muted-foreground mb-1">
+                                              Arguments:
+                                            </div>
+                                            <CodeBlock
+                                              language="json"
+                                              maxHeight="150px"
+                                              className="text-xs"
+                                            >
+                                              {JSON.stringify(tool.arguments, null, 2)}
+                                            </CodeBlock>
+                                          </div>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          }
+                          // Fallback to raw JSON if parsing fails
+                          return (
+                            <CodeBlock
+                              language="json"
+                              maxHeight="200px"
+                              className="text-xs"
+                            >
+                              {JSON.stringify(execution.result, null, 2)}
+                            </CodeBlock>
+                          );
+                        })()
+                      ) : (
+                        <CodeBlock
+                          language="json"
+                          maxHeight="200px"
+                          className="text-xs"
+                        >
+                          {JSON.stringify(execution.result, null, 2)}
+                        </CodeBlock>
+                      )}
                     </div>
                   )}
                 </div>

@@ -6,6 +6,7 @@ import {
   GetNamespaceToolsRequestSchema,
   GetNamespaceToolsResponseSchema,
   ListNamespacesResponseSchema,
+  McpServer,
   RefreshNamespaceToolsRequestSchema,
   RefreshNamespaceToolsResponseSchema,
   UpdateNamespaceRequestSchema,
@@ -32,6 +33,7 @@ import {
 } from "../lib/metamcp/metamcp-middleware/tool-overrides.functional";
 import { clearSmartDiscoveryCache } from "../lib/metamcp/metamcp-middleware/smart-discovery.functional";
 import { metaMcpServerPool } from "../lib/metamcp/metamcp-server-pool";
+import { parseToolName } from "../lib/metamcp/tool-name-parser";
 
 export const namespacesImplementations = {
   create: async (
@@ -53,7 +55,7 @@ export const namespacesImplementations = {
         const servers = await Promise.all(serverPromises);
 
         // Check if any servers don't exist
-        const missingServers = servers.some((server) => !server);
+        const missingServers = servers.some((server: McpServer) => !server);
         if (missingServers) {
           return {
             success: false as const,
@@ -89,6 +91,8 @@ export const namespacesImplementations = {
         mcpServerUuids: input.mcpServerUuids,
         user_id: effectiveUserId,
         smart_discovery_enabled: input.smartDiscoveryEnabled ?? false,
+        smart_discovery_description: input.smartDiscoveryDescription,
+        smart_discovery_pinned_tools: [],
       });
 
       // Ensure idle MetaMCP server exists for the new namespace to improve performance
@@ -349,7 +353,7 @@ export const namespacesImplementations = {
         const servers = await Promise.all(serverPromises);
 
         // Check if any servers don't exist
-        const missingServers = servers.some((server) => !server);
+        const missingServers = servers.some((server: McpServer) => !server);
         if (missingServers) {
           return {
             success: false as const,
@@ -386,6 +390,8 @@ export const namespacesImplementations = {
         user_id: input.user_id,
         mcpServerUuids: input.mcpServerUuids,
         smart_discovery_enabled: input.smartDiscoveryEnabled,
+        smart_discovery_description: input.smartDiscoveryDescription,
+        smart_discovery_pinned_tools: input.smartDiscoveryPinnedTools,
       });
 
       // Invalidate idle MetaMCP server for this namespace since the MCP servers list may have changed
@@ -703,18 +709,18 @@ export const namespacesImplementations = {
       }> = [];
 
       for (const tool of input.tools) {
-        // Split by "__" - use last occurrence if there are multiple
-        const lastDoubleUnderscoreIndex = tool.name.lastIndexOf("__");
+        // Use the shared parser to ensure consistency with frontend
+        const parsed = parseToolName(tool.name);
 
-        if (lastDoubleUnderscoreIndex === -1) {
+        if (!parsed) {
           console.warn(
             `Tool name "${tool.name}" does not contain "__" separator, skipping`,
           );
           continue;
         }
 
-        const serverName = tool.name.substring(0, lastDoubleUnderscoreIndex);
-        const toolName = tool.name.substring(lastDoubleUnderscoreIndex + 2);
+        let serverName = parsed.serverName;
+        let toolName = parsed.originalToolName;
 
         // Check if this tool name might be an override name by looking up the original name
         // If it is an override name, skip this tool entirely to avoid duplicates
@@ -763,6 +769,33 @@ export const namespacesImplementations = {
         };
       }
 
+      // Get servers associated with this namespace first
+      const namespaceWithServers =
+        await namespacesRepository.findByUuidWithServers(input.namespaceUuid);
+
+      if (!namespaceWithServers) {
+        return {
+          success: false as const,
+          message: "Namespace not found",
+        };
+      }
+
+      // Create a map of server names to server data for quick lookup
+      const namespaceServersMap = new Map<string, typeof namespaceWithServers.servers[0]>();
+      for (const server of namespaceWithServers.servers) {
+        namespaceServersMap.set(server.name, server);
+      }
+
+      // Log available servers for debugging
+      console.log(
+        `[refreshTools] Namespace "${input.namespaceUuid}" has ${namespaceWithServers.servers.length} server(s):`,
+        namespaceWithServers.servers.map((s: McpServer) => s.name).join(", "),
+      );
+      console.log(
+        `[refreshTools] Parsed ${parsedTools.length} tool(s) from input:`,
+        parsedTools.map((t) => `${t.serverName}__${t.toolName}`).join(", "),
+      );
+
       // Group tools by server name and resolve server UUIDs
       const toolsByServerName: Record<
         string,
@@ -777,14 +810,12 @@ export const namespacesImplementations = {
       > = {};
 
       for (const parsedTool of parsedTools) {
-        // Find server by name - first try exact match
-        let server = await mcpServersRepository.findByName(
-          parsedTool.serverName,
-        );
+        // Find server by name in the namespace's servers
+        let server = namespaceServersMap.get(parsedTool.serverName);
 
         // If exact match fails, try to handle nested MetaMCP scenarios
         // For nested MetaMCP, tool names may be in format "ParentServer__ChildServer__tool"
-        // but we need to find the actual "ParentServer" in the database
+        // but we need to find the actual "ParentServer" in the namespace
         if (!server && parsedTool.serverName.includes("__")) {
           // Try the first part before the first "__" (this would be the actual server)
           const firstDoubleUnderscoreIndex =
@@ -794,7 +825,7 @@ export const namespacesImplementations = {
             firstDoubleUnderscoreIndex,
           );
 
-          server = await mcpServersRepository.findByName(actualServerName);
+          server = namespaceServersMap.get(actualServerName);
 
           if (server) {
             console.log(
@@ -811,7 +842,7 @@ export const namespacesImplementations = {
 
         if (!server) {
           console.warn(
-            `Server "${parsedTool.serverName}" not found in database, skipping tool "${parsedTool.toolName}"`,
+            `[refreshTools] Server "${parsedTool.serverName}" not found in namespace "${input.namespaceUuid}". Available servers: ${Array.from(namespaceServersMap.keys()).join(", ")}. Skipping tool "${parsedTool.toolName}"`,
           );
           continue;
         }

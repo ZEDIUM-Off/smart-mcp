@@ -266,7 +266,7 @@ export function NamespacesList() {
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
-    onGlobalFilterChange: (value) => setGlobalFilter(value ?? ""),
+    onGlobalFilterChange: (value) => setGlobalFilter(value || ""),
     state: {
       sorting,
       globalFilter,
@@ -282,6 +282,8 @@ export function NamespacesList() {
             <Input
               placeholder={t("namespaces.searchPlaceholder")}
               className="pl-8"
+              value={globalFilter}
+              onChange={(event) => setGlobalFilter(event.target.value || "")}
               disabled
             />
           </div>
@@ -305,6 +307,8 @@ export function NamespacesList() {
             <Input
               placeholder={t("namespaces.searchPlaceholder")}
               className="pl-8"
+              value={globalFilter}
+              onChange={(event) => setGlobalFilter(event.target.value || "")}
               disabled
             />
           </div>
@@ -326,8 +330,8 @@ export function NamespacesList() {
           <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder={t("namespaces.searchPlaceholder")}
-            value={globalFilter ?? ""}
-            onChange={(event) => setGlobalFilter(event.target.value ?? "")}
+            value={typeof globalFilter === "string" ? globalFilter : ""}
+            onChange={(event) => setGlobalFilter(event.target.value || "")}
             className="pl-8"
           />
         </div>

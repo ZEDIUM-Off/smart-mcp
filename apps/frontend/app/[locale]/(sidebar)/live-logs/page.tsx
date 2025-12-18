@@ -1,9 +1,10 @@
 "use client";
 
 import { FileTerminal, RefreshCw, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
+import { usePageHeader } from "@/components/page-header-context";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,6 +21,7 @@ import { useLogsStore } from "@/lib/stores/logs-store";
 
 export default function LiveLogsPage() {
   const { t } = useTranslations();
+  const { setHeader, clearHeader } = usePageHeader();
   const [showClearDialog, setShowClearDialog] = useState(false);
   const {
     logs,
@@ -32,7 +34,7 @@ export default function LiveLogsPage() {
     setAutoRefresh,
   } = useLogsStore();
 
-  const handleClearLogs = async () => {
+  const handleClearLogs = useCallback(async () => {
     try {
       await clearLogs();
       toast.success(t("logs:logsClearSuccess"));
@@ -40,25 +42,25 @@ export default function LiveLogsPage() {
     } catch (_error) {
       toast.error(t("logs:logsClearError"));
     }
-  };
+  }, [clearLogs, t]);
 
-  const handleRefresh = async () => {
+  const handleRefresh = useCallback(async () => {
     try {
       await fetchLogs();
       toast.success(t("logs:refreshSuccess"));
     } catch (_error) {
       toast.error(t("logs:refreshError"));
     }
-  };
+  }, [fetchLogs, t]);
 
-  const handleToggleAutoRefresh = () => {
+  const handleToggleAutoRefresh = useCallback(() => {
     setAutoRefresh(!isAutoRefreshing);
     if (!isAutoRefreshing) {
       toast.success(t("logs:autoRefreshEnabled"));
     } else {
       toast.info(t("logs:autoRefreshDisabled"));
     }
-  };
+  }, [isAutoRefreshing, setAutoRefresh, t]);
 
   // const getLevelColor = (level: string) => {
   //   switch (level) {
@@ -77,35 +79,25 @@ export default function LiveLogsPage() {
     return new Date(timestamp).toLocaleString();
   };
 
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <FileTerminal className="h-6 w-6 text-muted-foreground" />
-          <div>
-            <h1 className="text-2xl font-semibold">{t("logs:title")}</h1>
-            <p className="text-sm text-muted-foreground">
-              {t("logs:subtitle")}
-              {lastFetch && (
-                <span className="ml-2">
-                  (
-                  {t("logs:lastUpdated", {
-                    timestamp: formatTimestamp(lastFetch),
-                  })}
-                  )
-                </span>
-              )}
-            </p>
-          </div>
-        </div>
+  useEffect(() => {
+    const desc =
+      lastFetch
+        ? `${t("logs:subtitle")} (${t("logs:lastUpdated", {
+            timestamp: formatTimestamp(lastFetch),
+          })})`
+        : t("logs:subtitle");
+
+    setHeader({
+      title: t("logs:title"),
+      description: desc,
+      icon: <FileTerminal className="h-5 w-5" />,
+      actions: (
         <div className="flex items-center gap-2">
           <Badge variant="outline">
             {t("logs:totalLogs", { count: totalCount })}
           </Badge>
           <Button variant="outline" size="sm" onClick={handleToggleAutoRefresh}>
-            {isAutoRefreshing
-              ? t("logs:stopAutoRefresh")
-              : t("logs:startAutoRefresh")}
+            {isAutoRefreshing ? t("logs:stopAutoRefresh") : t("logs:startAutoRefresh")}
           </Button>
           <Button
             variant="outline"
@@ -113,9 +105,7 @@ export default function LiveLogsPage() {
             onClick={handleRefresh}
             disabled={isLoading}
           >
-            <RefreshCw
-              className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`}
-            />
+            <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
             {t("logs:refresh")}
           </Button>
           <Button
@@ -128,8 +118,25 @@ export default function LiveLogsPage() {
             {t("logs:clearLogs")}
           </Button>
         </div>
-      </div>
+      ),
+    });
 
+    return () => clearHeader();
+  }, [
+    clearHeader,
+    handleRefresh,
+    handleToggleAutoRefresh,
+    isAutoRefreshing,
+    isLoading,
+    lastFetch,
+    logs.length,
+    setHeader,
+    t,
+    totalCount,
+  ]);
+
+  return (
+    <div className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">

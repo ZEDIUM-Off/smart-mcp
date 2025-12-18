@@ -1,10 +1,12 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { Search as SearchIcon } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 
 import { SearchSkeleton } from "@/components/skeletons/search-skeleton";
+import { usePageHeader } from "@/components/page-header-context";
 import { Input } from "@/components/ui/input";
 import { useTranslations } from "@/hooks/useTranslations";
 import type { PaginatedSearchResult } from "@/types/search";
@@ -17,6 +19,7 @@ const PAGE_SIZE = 6;
 function SearchContent() {
   const { t } = useTranslations();
   const searchParams = useSearchParams();
+  const { setHeader, clearHeader } = usePageHeader();
 
   // Initialize search query from URL on mount (for direct links)
   const initialQuery = searchParams.get("query") || "";
@@ -72,9 +75,17 @@ function SearchContent() {
     };
   }, [data, currentPage]);
 
+  useEffect(() => {
+    setHeader({
+      title: t("search:title"),
+      description: t("search:searchPlaceholder"),
+      icon: <SearchIcon className="h-5 w-5" />,
+    });
+    return () => clearHeader();
+  }, [clearHeader, setHeader, t]);
+
   return (
-    <div className="container mx-auto py-8 space-y-6 flex flex-col items-center">
-      <h1 className="text-2xl font-bold">{t("search:title")}</h1>
+    <div className="space-y-6 flex flex-col items-center">
       <Input
         type="search"
         placeholder={t("search:searchPlaceholder")}

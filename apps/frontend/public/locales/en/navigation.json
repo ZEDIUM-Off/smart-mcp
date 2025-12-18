@@ -1,4 +1,5 @@
 {
+  "dashboard": "Dashboard",
   "exploreMcpServers": "Explore MCP Servers (beta)",
   "mcpServers": "MCP Servers",
   "metamcpNamespaces": "MetaMCP Namespaces",

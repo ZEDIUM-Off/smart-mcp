@@ -1,4 +1,5 @@
 {
+  "dashboard": "仪表板",
   "exploreMcpServers": "探索 MCP 服务器 (测试版)",
   "mcpServers": "MCP 服务器",
   "metamcpNamespaces": "MetaMCP 命名空间",

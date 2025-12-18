@@ -2,10 +2,12 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { type SettingsFormData, SettingsFormSchema } from "@repo/zod-types";
+import { Settings as SettingsIcon } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 
+import { usePageHeader } from "@/components/page-header-context";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -23,6 +25,7 @@ import { trpc } from "@/lib/trpc";
 
 export default function SettingsPage() {
   const { t } = useTranslations();
+  const { setHeader, clearHeader } = usePageHeader();
   const [isSignupDisabled, setIsSignupDisabled] = useState(false);
   const [isSsoSignupDisabled, setIsSsoSignupDisabled] = useState(false);
   const [isBasicAuthDisabled, setIsBasicAuthDisabled] = useState(false);
@@ -404,15 +407,18 @@ export default function SettingsPage() {
     mcpMaxAttemptsLoading ||
     sessionLifetimeLoading;
 
+  useEffect(() => {
+    setHeader({
+      title: t("settings:title"),
+      description: t("settings:description"),
+      icon: <SettingsIcon className="h-5 w-5" />,
+    });
+    return () => clearHeader();
+  }, [clearHeader, setHeader, t]);
+
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            {t("settings:title")}
-          </h1>
-          <p className="text-muted-foreground">{t("settings:description")}</p>
-        </div>
         <div>{t("settings:loading")}</div>
       </div>
     );
@@ -420,13 +426,6 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">
-          {t("settings:title")}
-        </h1>
-        <p className="text-muted-foreground">{t("settings:description")}</p>
-      </div>
-
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <Card>
           <CardHeader>
@@ -645,7 +644,7 @@ export default function SettingsPage() {
                           type="number"
                           min="5"
                           max="1440"
-                          value={field.value || 240}
+                          value={typeof field.value === "number" ? field.value : 240}
                           onChange={(e) => {
                             const value = parseInt(e.target.value, 10);
                             field.onChange(isNaN(value) ? 240 : value);

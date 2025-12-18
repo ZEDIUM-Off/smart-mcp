@@ -37,6 +37,7 @@ export const CreateNamespaceRequestSchema = z.object({
   description: z.string().optional(),
   mcpServerUuids: z.array(z.string()).optional(),
   user_id: z.string().nullable().optional(),
+  smartDiscoveryEnabled: z.boolean().optional().default(false),
   smartDiscoveryDescription: z.string().optional(),
 });
 
@@ -49,6 +50,7 @@ export const NamespaceSchema = z.object({
   user_id: z.string().nullable(),
   smart_discovery_enabled: z.boolean(),
   smart_discovery_description: z.string().nullable().optional(),
+  smart_discovery_pinned_tools: z.array(z.string()).optional().default([]),
 });
 
 // Server within namespace schema - extends McpServerSchema with namespace-specific status
@@ -109,6 +111,7 @@ export const UpdateNamespaceRequestSchema = z.object({
   user_id: z.string().nullable().optional(),
   smartDiscoveryEnabled: z.boolean().optional(),
   smartDiscoveryDescription: z.string().optional(),
+  smartDiscoveryPinnedTools: z.array(z.string()).optional(),
 });
 
 export const UpdateNamespaceResponseSchema = z.object({
@@ -247,6 +250,7 @@ export const NamespaceCreateInputSchema = z.object({
   user_id: z.string().nullable().optional(),
   smart_discovery_enabled: z.boolean().optional().default(false),
   smart_discovery_description: z.string().nullable().optional(),
+  smart_discovery_pinned_tools: z.array(z.string()).optional().default([]),
 });
 
 export const NamespaceUpdateInputSchema = z.object({
@@ -257,6 +261,7 @@ export const NamespaceUpdateInputSchema = z.object({
   user_id: z.string().nullable().optional(),
   smart_discovery_enabled: z.boolean().optional(),
   smart_discovery_description: z.string().nullable().optional(),
+  smart_discovery_pinned_tools: z.array(z.string()).optional(),
 });
 
 export const NamespaceServerStatusUpdateSchema = z.object({
@@ -304,6 +309,7 @@ export const DatabaseNamespaceSchema = z.object({
   user_id: z.string().nullable(),
   smart_discovery_enabled: z.boolean(),
   smart_discovery_description: z.string().nullable(),
+  smart_discovery_pinned_tools: z.array(z.string()).default([]),
 });
 
 export const DatabaseNamespaceServerSchema = z.object({
@@ -320,6 +326,7 @@ export const DatabaseNamespaceServerSchema = z.object({
   created_at: z.date(),
   user_id: z.string().nullable(),
   status: McpServerStatusEnum,
+  error_status: McpServerErrorStatusEnum.optional(),
 });
 
 export const DatabaseNamespaceWithServersSchema =

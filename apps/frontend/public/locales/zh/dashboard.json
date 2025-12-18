@@ -1,0 +1,25 @@
+{
+  "title": "仪表板",
+  "description": "MCP 服务器、端点和实时连接概览",
+  "totalServers": "MCP 服务器总数",
+  "serversConfigured": "已配置的服务器",
+  "serversWithErrors": "有错误的服务器",
+  "serversNeedingAttention": "需要关注",
+  "totalEndpoints": "端点总数",
+  "endpointsConfigured": "已配置的端点",
+  "liveConnections": "实时连接",
+  "topEndpoints": "连接数最多的端点",
+  "topEndpointsDescription": "具有最多活动连接的端点",
+  "noActiveConnections": "没有活动连接",
+  "namespace": "命名空间",
+  "totalConnections": "总连接数",
+  "metaMcpPool": "MetaMCP 池状态",
+  "metaMcpPoolDescription": "MetaMCP 服务器的内部池状态",
+  "mcpServerPool": "MCP 服务器池状态",
+  "mcpServerPoolDescription": "MCP 服务器的内部池状态",
+  "idle": "空闲",
+  "active": "活动",
+  "errorLoadingTitle": "加载仪表板错误",
+  "errorLoadingDescription": "加载仪表板统计信息失败"
+}
+

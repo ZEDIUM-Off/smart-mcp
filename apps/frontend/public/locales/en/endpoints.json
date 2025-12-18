@@ -120,6 +120,10 @@
     "shttpUrlWithApiKeyCopied": "SHTTP URL with API key parameter copied to clipboard",
     "openApiUrlWithApiKeyCopied": "OpenAPI URL with API key parameter copied to clipboard",
     "openApiSchemaUrlWithApiKeyCopied": "OpenAPI Schema URL with API key parameter copied to clipboard",
+    "addToCursor": "Add to Cursor (SSE)",
+    "addToCursorCopied": "Cursor install link copied",
+    "addToCursorDescription": "The deeplink has been copied to your clipboard and will open in Cursor if installed.",
+    "addToCursorError": "Failed to generate Cursor install link",
     "noResults": "No results."
   }
 }

@@ -29,6 +29,7 @@ export class NamespacesRepository {
           user_id: input.user_id,
           smart_discovery_enabled: input.smart_discovery_enabled ?? false,
           smart_discovery_description: input.smart_discovery_description,
+          smart_discovery_pinned_tools: input.smart_discovery_pinned_tools ?? [],
         })
         .returning();
 
@@ -82,6 +83,7 @@ export class NamespacesRepository {
         user_id: namespacesTable.user_id,
         smart_discovery_enabled: namespacesTable.smart_discovery_enabled,
         smart_discovery_description: namespacesTable.smart_discovery_description,
+        smart_discovery_pinned_tools: namespacesTable.smart_discovery_pinned_tools,
       })
       .from(namespacesTable)
       .orderBy(desc(namespacesTable.created_at));
@@ -99,6 +101,7 @@ export class NamespacesRepository {
         user_id: namespacesTable.user_id,
         smart_discovery_enabled: namespacesTable.smart_discovery_enabled,
         smart_discovery_description: namespacesTable.smart_discovery_description,
+        smart_discovery_pinned_tools: namespacesTable.smart_discovery_pinned_tools,
       })
       .from(namespacesTable)
       .where(
@@ -122,6 +125,7 @@ export class NamespacesRepository {
         user_id: namespacesTable.user_id,
         smart_discovery_enabled: namespacesTable.smart_discovery_enabled,
         smart_discovery_description: namespacesTable.smart_discovery_description,
+        smart_discovery_pinned_tools: namespacesTable.smart_discovery_pinned_tools,
       })
       .from(namespacesTable)
       .where(isNull(namespacesTable.user_id))
@@ -140,6 +144,7 @@ export class NamespacesRepository {
         user_id: namespacesTable.user_id,
         smart_discovery_enabled: namespacesTable.smart_discovery_enabled,
         smart_discovery_description: namespacesTable.smart_discovery_description,
+        smart_discovery_pinned_tools: namespacesTable.smart_discovery_pinned_tools,
       })
       .from(namespacesTable)
       .where(eq(namespacesTable.user_id, userId))
@@ -157,6 +162,7 @@ export class NamespacesRepository {
         user_id: namespacesTable.user_id,
         smart_discovery_enabled: namespacesTable.smart_discovery_enabled,
         smart_discovery_description: namespacesTable.smart_discovery_description,
+        smart_discovery_pinned_tools: namespacesTable.smart_discovery_pinned_tools,
       })
       .from(namespacesTable)
       .where(eq(namespacesTable.uuid, uuid));
@@ -179,6 +185,7 @@ export class NamespacesRepository {
         user_id: namespacesTable.user_id,
         smart_discovery_enabled: namespacesTable.smart_discovery_enabled,
         smart_discovery_description: namespacesTable.smart_discovery_description,
+        smart_discovery_pinned_tools: namespacesTable.smart_discovery_pinned_tools,
       })
       .from(namespacesTable)
       .where(
@@ -310,6 +317,7 @@ export class NamespacesRepository {
         updated_at: Date;
         smart_discovery_enabled?: boolean;
         smart_discovery_description?: string | null;
+        smart_discovery_pinned_tools?: string[];
       } = {
         name: input.name,
         description: input.description,
@@ -324,6 +332,10 @@ export class NamespacesRepository {
 
       if (input.smart_discovery_description !== undefined) {
         updateData.smart_discovery_description = input.smart_discovery_description;
+      }
+
+      if (input.smart_discovery_pinned_tools !== undefined) {
+        updateData.smart_discovery_pinned_tools = input.smart_discovery_pinned_tools;
       }
 
       // Update the namespace

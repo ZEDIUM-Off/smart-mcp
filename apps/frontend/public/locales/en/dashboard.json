@@ -1,0 +1,25 @@
+{
+  "title": "Dashboard",
+  "description": "Overview of MCP servers, endpoints, and live connections",
+  "totalServers": "Total MCP Servers",
+  "serversConfigured": "Servers configured",
+  "serversWithErrors": "Servers with Errors",
+  "serversNeedingAttention": "Requiring attention",
+  "totalEndpoints": "Total Endpoints",
+  "endpointsConfigured": "Endpoints configured",
+  "liveConnections": "Live Connections",
+  "topEndpoints": "Top Endpoints by Connections",
+  "topEndpointsDescription": "Endpoints with the most active connections",
+  "noActiveConnections": "No active connections",
+  "namespace": "Namespace",
+  "totalConnections": "Total Connections",
+  "metaMcpPool": "MetaMCP Pool Status",
+  "metaMcpPoolDescription": "Internal pool status for MetaMCP servers",
+  "mcpServerPool": "MCP Server Pool Status",
+  "mcpServerPoolDescription": "Internal pool status for MCP servers",
+  "idle": "Idle",
+  "active": "Active",
+  "errorLoadingTitle": "Error Loading Dashboard",
+  "errorLoadingDescription": "Failed to load dashboard statistics"
+}
+

@@ -17,6 +17,7 @@ export const createAppRouter = (implementations: {
       config: frontendRouters.config,
       logs: frontendRouters.logs,
       packageInstaller: frontendRouters.packageInstaller,
+      dashboard: frontendRouters.dashboard,
     }),
   });
 };

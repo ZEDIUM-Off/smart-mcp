@@ -3,11 +3,12 @@
 import { CreateApiKeyFormSchema } from "@repo/zod-types";
 import { format } from "date-fns";
 import { Copy, Eye, EyeOff, Key, Plus, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
+import { usePageHeader } from "@/components/page-header-context";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,7 +38,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
 import {
   Table,
   TableBody,
@@ -146,137 +146,118 @@ export default function ApiKeysPage() {
     setApiKeyToDelete(null);
   };
 
+  const { setHeader, clearHeader } = usePageHeader();
+  useEffect(() => {
+    setHeader({
+      title: t("api-keys:title"),
+      description: t("api-keys:description"),
+      icon: <Key className="h-5 w-5" />,
+      actions: (
+        <Button onClick={() => setCreateDialogOpen(true)}>
+          <Plus className="h-4 w-4 mr-2" />
+          {t("api-keys:createApiKey")}
+        </Button>
+      ),
+    });
+    return () => clearHeader();
+  }, [clearHeader, setHeader, t]);
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Key className="h-8 w-8 text-primary" />
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">
-              {t("api-keys:title")}
-            </h1>
-            <p className="text-muted-foreground">{t("api-keys:description")}</p>
-          </div>
-        </div>
-        <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              {t("api-keys:createApiKey")}
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{t("api-keys:createApiKey")}</DialogTitle>
-              <DialogDescription>
-                {t("api-keys:createApiKeyDescription")}
-              </DialogDescription>
-            </DialogHeader>
-            {newApiKey ? (
-              <div className="space-y-4">
-                <div className="p-4 bg-muted rounded-lg">
-                  <p className="text-sm font-medium mb-2">
-                    {t("api-keys:newApiKey")}
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <code className="flex-1 p-2 bg-background rounded border text-sm font-mono break-all">
-                      {newApiKey}
-                    </code>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => copyToClipboard(newApiKey)}
-                    >
-                      <Copy className="h-4 w-4" />
-                    </Button>
-                  </div>
+      <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("api-keys:createApiKey")}</DialogTitle>
+            <DialogDescription>
+              {t("api-keys:createApiKeyDescription")}
+            </DialogDescription>
+          </DialogHeader>
+          {newApiKey ? (
+            <div className="space-y-4">
+              <div className="p-4 bg-muted rounded-lg">
+                <p className="text-sm font-medium mb-2">
+                  {t("api-keys:newApiKey")}
+                </p>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 p-2 bg-background rounded border text-sm font-mono break-all">
+                    {newApiKey}
+                  </code>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => copyToClipboard(newApiKey)}
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
                 </div>
-                <Button
-                  onClick={() => {
-                    setNewApiKey(null);
-                    handleCreateSuccess();
+              </div>
+              <Button
+                onClick={() => {
+                  setNewApiKey(null);
+                  handleCreateSuccess();
+                }}
+                className="w-full"
+              >
+                {t("api-keys:done")}
+              </Button>
+            </div>
+          ) : (
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <div>
+                <label className="text-sm font-medium">{t("api-keys:name")}</label>
+                <Input
+                  {...form.register("name")}
+                  placeholder={t("api-keys:namePlaceholder")}
+                />
+                {form.formState.errors.name && (
+                  <p className="text-sm text-destructive mt-1">
+                    {form.formState.errors.name.message}
+                  </p>
+                )}
+              </div>
+              <div>
+                <Label htmlFor="ownership" className="text-sm font-medium">
+                  {t("api-keys:ownership")}
+                </Label>
+                <Select
+                  value={form.watch("user_id") === null ? "public" : "private"}
+                  onValueChange={(value) => {
+                    form.setValue("user_id", value === "public" ? null : undefined);
                   }}
-                  className="w-full"
                 >
-                  {t("api-keys:done")}
+                  <SelectTrigger>
+                    <SelectValue placeholder={t("api-keys:ownership")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="private">{t("api-keys:forMyself")}</SelectItem>
+                    <SelectItem value="public">{t("api-keys:everyone")}</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {t("api-keys:ownershipDescription")}
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setCreateDialogOpen(false)}
+                  className="flex-1"
+                >
+                  {t("api-keys:cancel")}
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={createMutation.isPending}
+                  className="flex-1"
+                >
+                  {createMutation.isPending ? t("common:creating") : t("common:create")}
                 </Button>
               </div>
-            ) : (
-              <form
-                onSubmit={form.handleSubmit(onSubmit)}
-                className="space-y-4"
-              >
-                <div>
-                  <label className="text-sm font-medium">
-                    {t("api-keys:name")}
-                  </label>
-                  <Input
-                    {...form.register("name")}
-                    placeholder={t("api-keys:namePlaceholder")}
-                  />
-                  {form.formState.errors.name && (
-                    <p className="text-sm text-destructive mt-1">
-                      {form.formState.errors.name.message}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <Label htmlFor="ownership" className="text-sm font-medium">
-                    {t("api-keys:ownership")}
-                  </Label>
-                  <Select
-                    value={
-                      form.watch("user_id") === null ? "public" : "private"
-                    }
-                    onValueChange={(value) => {
-                      form.setValue(
-                        "user_id",
-                        value === "public" ? null : undefined,
-                      );
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={t("api-keys:ownership")} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="private">
-                        {t("api-keys:forMyself")}
-                      </SelectItem>
-                      <SelectItem value="public">
-                        {t("api-keys:everyone")}
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {t("api-keys:ownershipDescription")}
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setCreateDialogOpen(false)}
-                    className="flex-1"
-                  >
-                    {t("api-keys:cancel")}
-                  </Button>
-                  <Button
-                    type="submit"
-                    disabled={createMutation.isPending}
-                    className="flex-1"
-                  >
-                    {createMutation.isPending
-                      ? t("common:creating")
-                      : t("common:create")}
-                  </Button>
-                </div>
-              </form>
-            )}
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      <Separator />
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <div className="rounded-md border">
         <Table>

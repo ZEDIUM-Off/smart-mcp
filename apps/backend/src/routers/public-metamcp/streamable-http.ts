@@ -10,6 +10,7 @@ import {
 import { lookupEndpoint } from "@/middleware/lookup-endpoint-middleware";
 
 import { metaMcpServerPool } from "../../lib/metamcp/metamcp-server-pool";
+import { liveConnectionsTracker } from "../../lib/metamcp/live-connections-tracker";
 import { SessionLifetimeManagerImpl } from "../../lib/session-lifetime-manager";
 
 const streamableHttpRouter = express.Router();
@@ -168,6 +169,14 @@ streamableHttpRouter.post(
         // Store transport reference
         sessionManager.addSession(newSessionId, transport);
 
+        // Track live connection
+        liveConnectionsTracker.addConnection(
+          newSessionId,
+          endpointName,
+          namespaceUuid,
+          "StreamableHTTP",
+        );
+
         console.log(
           `Public Endpoint Client <-> Proxy sessionId: ${newSessionId} for endpoint ${endpointName} -> namespace ${namespaceUuid}`,
         );
@@ -259,6 +268,8 @@ streamableHttpRouter.delete(
           sessionManager.getSessionIds(),
         );
 
+        // Remove from tracker before cleanup
+        liveConnectionsTracker.removeConnection(sessionId);
         await cleanupSession(sessionId);
 
         console.log(
@@ -293,6 +304,8 @@ streamableHttpRouter.delete(
 
 // Initialize automatic cleanup timer using session manager
 sessionManager.startCleanupTimer(async (sessionId, transport) => {
+  // Remove from tracker before cleanup
+  liveConnectionsTracker.removeConnection(sessionId);
   await cleanupSession(sessionId, transport);
 });
 

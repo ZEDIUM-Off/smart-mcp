@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { getTranslation, loadTranslations, Translations } from "@/lib/i18n";
 
@@ -16,10 +16,10 @@ export function useTranslations() {
       .finally(() => setIsLoading(false));
   }, [locale]);
 
-  const t = (key: string, params?: Record<string, string | number>) => {
+  const t = useCallback((key: string, params?: Record<string, string | number>) => {
     if (!translations) return key;
     return getTranslation(translations, key, params);
-  };
+  }, [translations]);
 
-  return { t, isLoading, locale };
+  return useMemo(() => ({ t, isLoading, locale }), [t, isLoading, locale]);
 }

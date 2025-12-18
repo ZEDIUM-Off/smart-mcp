@@ -144,6 +144,18 @@
     "autoSaving": "自动保存中...",
     "active": "活跃",
     "inactive": "非活跃",
+    "pinTool": "默认暴露（置顶）",
+    "unpinTool": "取消置顶",
+    "pinnedBadge": "已置顶",
+    "pinnedTooltip": "启用智能发现时默认暴露",
+    "pinsUpdated": "已更新置顶工具",
+    "pinsUpdateFailed": "更新置顶工具失败",
+    "enableSmartDiscoveryToPin": "启用 Smart Discovery 才能置顶工具",
+    "sections": {
+      "pinned": "置顶（{{count}}）",
+      "discovered": "智能发现（{{count}}）",
+      "fromServers": "来自服务器（{{count}}）"
+    },
     "editOverrides": "编辑覆盖"
   },
   "serversTable": {

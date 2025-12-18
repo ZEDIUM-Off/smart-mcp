@@ -209,6 +209,7 @@
     "formatDuration": {
       "milliseconds": "{{duration}}ms",
       "seconds": "{{duration}}s"
-    }
+    },
+    "toolCallCopied": "Tool call copied to clipboard"
   }
 }

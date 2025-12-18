@@ -12,6 +12,7 @@ export type Translations = {
   common: Record<string, any>;
   auth: Record<string, any>;
   navigation: Record<string, any>;
+  dashboard: Record<string, any>;
   "mcp-servers": Record<string, any>;
   namespaces: Record<string, any>;
   endpoints: Record<string, any>;
@@ -58,6 +59,7 @@ export async function loadTranslations(
       auth: (await import("../public/locales/en/auth.json")).default,
       navigation: (await import("../public/locales/en/navigation.json"))
         .default,
+      dashboard: (await import("../public/locales/en/dashboard.json")).default,
       "mcp-servers": (await import("../public/locales/en/mcp-servers.json"))
         .default,
       namespaces: (await import("../public/locales/en/namespaces.json"))
@@ -77,6 +79,7 @@ export async function loadTranslations(
       commonZh,
       authZh,
       navigationZh,
+      dashboardZh,
       mcpServersZh,
       namespacesZh,
       endpointsZh,
@@ -90,6 +93,9 @@ export async function loadTranslations(
       import("../public/locales/zh/common.json").catch(() => ({ default: {} })),
       import("../public/locales/zh/auth.json").catch(() => ({ default: {} })),
       import("../public/locales/zh/navigation.json").catch(() => ({
+        default: {},
+      })),
+      import("../public/locales/zh/dashboard.json").catch(() => ({
         default: {},
       })),
       import("../public/locales/zh/mcp-servers.json").catch(() => ({
@@ -124,6 +130,7 @@ export async function loadTranslations(
       common: { ...englishDict.common, ...commonZh.default },
       auth: { ...englishDict.auth, ...authZh.default },
       navigation: { ...englishDict.navigation, ...navigationZh.default },
+      dashboard: { ...englishDict.dashboard, ...dashboardZh.default },
       "mcp-servers": { ...englishDict["mcp-servers"], ...mcpServersZh.default },
       namespaces: { ...englishDict.namespaces, ...namespacesZh.default },
       endpoints: { ...englishDict.endpoints, ...endpointsZh.default },

@@ -146,19 +146,32 @@ function buildFindToolDescription(tools: Tool[], namespaceDescription?: string |
   const lines: string[] = [];
 
   lines.push(
-    "Smart Discovery is enabled for this namespace.",
-    "Use metamcp__find to discover the right tools for a task. It searches semantically across tool names + descriptions.",
-    'Provide a natural-language query like: "take a screenshot", "fetch a url", "query postgres", "read files".',
+    "## Smart Discovery",
+    "",
+    "Smart Discovery is enabled for this namespace. Use `metamcp__find` to discover the right tools for a task.",
+    "",
+    "### How to Use",
+    "",
+    "Call `metamcp__find` with a natural-language query describing what you want to accomplish. The tool searches semantically across tool names and descriptions.",
+    "",
+    "### Examples",
+    "",
+    "```",
+    'metamcp__find({ query: "take a screenshot" })',
+    'metamcp__find({ query: "fetch a url" })',
+    'metamcp__find({ query: "query postgres database" })',
+    'metamcp__find({ query: "read and write files" })',
+    "```",
     "",
   );
 
   if (namespaceDescription && namespaceDescription.trim()) {
-    lines.push("Namespace hint:", namespaceDescription.trim(), "");
+    lines.push("### Namespace Context", "", namespaceDescription.trim(), "");
   }
 
   const filtered = (tools || []).filter((t) => t?.name && t.name !== "metamcp__find");
   if (filtered.length === 0) {
-    lines.push("No tools are currently available to index in this namespace.");
+    lines.push("### Available Tools", "", "No tools are currently available to index in this namespace.");
     return lines.join("\n");
   }
 
@@ -172,21 +185,43 @@ function buildFindToolDescription(tools: Tool[], namespaceDescription?: string |
     groups.set(server, arr);
   }
 
-  lines.push(`Registry overview: ${filtered.length} tool(s) across ${groups.size} server(s).`, "");
+  lines.push(
+    "### Available Tools",
+    "",
+    `**Registry overview:** ${filtered.length} tool(s) across ${groups.size} server(s).`,
+    "",
+  );
 
   // Stable output: sort servers + tools
   const serverNames = Array.from(groups.keys()).sort((a, b) => a.localeCompare(b));
   for (const serverName of serverNames) {
     const serverTools = (groups.get(serverName) ?? []).slice().sort((a, b) => a.name.localeCompare(b.name));
-    lines.push(`Server: ${serverName} (${serverTools.length} tool(s))`);
+    lines.push(`#### Server: \`${serverName}\` (${serverTools.length} tool(s))`, "");
     for (const tool of serverTools) {
       const idx = tool.name.indexOf("__");
       const shortName = idx === -1 ? tool.name : tool.name.slice(idx + 2);
       const desc = (tool.description || "").trim();
-      lines.push(`- ${shortName}: ${desc || "No description."}`);
+      lines.push(`- **\`${shortName}\`**: ${desc || "No description."}`);
     }
     lines.push("");
   }
+
+  lines.push(
+    "### What You Will Get Back",
+    "",
+    "The tool returns a JSON object with:",
+    "",
+    "- `message`: A summary message",
+    "- `query`: Your original query",
+    "- `tools`: An array of matching tool definitions, each containing:",
+    "  - `name`: The full tool name (e.g., `ServerName__toolName`)",
+    "  - `description`: Tool description",
+    "  - `arguments`: The tool's input schema (JSON Schema)",
+    "  - `relevanceScore`: Semantic relevance score (0-1)",
+    "",
+    "After receiving the results, you can call any of the returned tools directly by name.",
+    "",
+  );
 
   // Guard against pathological sizes while still being "as full as possible"
   const text = lines.join("\n");
@@ -194,7 +229,7 @@ function buildFindToolDescription(tools: Tool[], namespaceDescription?: string |
   if (text.length > MAX_CHARS) {
     return (
       text.slice(0, MAX_CHARS) +
-      `\n\n[Truncated: description exceeded ${MAX_CHARS} characters. Refine by using metamcp__find queries to discover specific tools.]`
+      `\n\n> **Note:** Description truncated (exceeded ${MAX_CHARS} characters). Use \`metamcp__find\` queries to discover specific tools.`
     );
   }
   return text;
@@ -205,17 +240,35 @@ function buildFindToolDescription(tools: Tool[], namespaceDescription?: string |
  */
 const getFindTool = (description?: string | null): Tool => ({
   name: "metamcp__find",
-  description: description || `Search for available tools by describing what you want to do.
-Returns matching tool definitions that you can then call directly.
+  description: description || `## Smart Discovery Tool
 
-Example queries:
-- "read and write files"
-- "search the web"
-- "run shell commands"
-- "manage git repositories"
-- "analyze data"
+Search for available tools by describing what you want to do. Returns matching tool definitions that you can then call directly.
 
-Returns a JSON array of matching tools with their names, descriptions, and input schemas.
+### How to Use
+
+Call this tool with a \`query\` parameter describing your task in natural language.
+
+### Examples
+
+\`\`\`
+metamcp__find({ query: "read and write files" })
+metamcp__find({ query: "search the web" })
+metamcp__find({ query: "run shell commands" })
+metamcp__find({ query: "manage git repositories" })
+metamcp__find({ query: "analyze data" })
+\`\`\`
+
+### What You Will Get Back
+
+Returns a JSON object with:
+- \`message\`: Summary message
+- \`query\`: Your original query
+- \`tools\`: Array of matching tool definitions, each with:
+  - \`name\`: Full tool name (e.g., \`ServerName__toolName\`)
+  - \`description\`: Tool description
+  - \`arguments\`: Tool's input schema (JSON Schema)
+  - \`relevanceScore\`: Semantic relevance score (0-1)
+
 After receiving the results, you can call any of the returned tools directly by name.`,
   inputSchema: {
     type: "object",
@@ -279,6 +332,35 @@ async function getSmartDiscoveryStatus(
 }
 
 /**
+ * Get pinned tools for a namespace
+ */
+async function getPinnedTools(
+  namespaceUuid: string
+): Promise<string[]> {
+  try {
+    const [namespace] = await db
+      .select({ 
+        smart_discovery_pinned_tools: namespacesTable.smart_discovery_pinned_tools
+      })
+      .from(namespacesTable)
+      .where(eq(namespacesTable.uuid, namespaceUuid));
+
+    // IMPORTANT: Drizzle's .$type<string[]>() is compile-time only.
+    // The DB value can be corrupted or manually modified, so we must validate at runtime.
+    const raw = namespace?.smart_discovery_pinned_tools as unknown;
+    if (!Array.isArray(raw)) return [];
+    // Filter to strings only; ignore invalid entries defensively.
+    return raw.filter((v): v is string => typeof v === "string");
+  } catch (error) {
+    console.error(
+      `[SmartDiscovery] Error fetching pinned tools for namespace ${namespaceUuid}:`,
+      error
+    );
+    return [];
+  }
+}
+
+/**
  * Creates a List Tools middleware that replaces the tool list
  * with just the "find" tool when smart discovery is enabled.
  *
@@ -316,17 +398,42 @@ export function createSmartDiscoveryListToolsMiddleware(
       }
 
       // 2. Get discovered tools for this session
-      // We use the connection ID as the session ID
-      const sessionId = context.connectionId || "default";
-      const discoveredToolNames = sessionManager.getDiscoveredToolNames(sessionId, context.namespaceUuid);
-      
+      const discoveredToolNames = sessionManager.getDiscoveredToolNames(context.sessionId, context.namespaceUuid);
       const discoveredTools = response.tools.filter(tool => discoveredToolNames.has(tool.name));
 
-      // 3. Return the synthetic "find" tool + any discovered tools
+      // 3. Get pinned tools
+      const pinnedToolNames = await getPinnedTools(context.namespaceUuid);
+      const pinnedToolsSet = new Set(pinnedToolNames);
+      const pinnedTools = response.tools.filter(tool => pinnedToolsSet.has(tool.name));
+
+      // 4. Combine all tools: find tool + pinned tools + discovered tools (avoid duplicates)
+      const allToolNames = new Set<string>();
+      const finalTools: Tool[] = [];
+      
+      // Add find tool first
       const findDescription = buildFindToolDescription(response.tools || [], status.description);
+      finalTools.push(getFindTool(findDescription));
+      allToolNames.add("metamcp__find");
+
+      // Add pinned tools
+      for (const tool of pinnedTools) {
+        if (!allToolNames.has(tool.name)) {
+          finalTools.push(tool);
+          allToolNames.add(tool.name);
+        }
+      }
+
+      // Add discovered tools
+      for (const tool of discoveredTools) {
+        if (!allToolNames.has(tool.name)) {
+          finalTools.push(tool);
+          allToolNames.add(tool.name);
+        }
+      }
+
       return {
         ...response,
-        tools: [getFindTool(findDescription), ...discoveredTools],
+        tools: finalTools,
       };
     };
   };
@@ -416,16 +523,15 @@ export function createSmartDiscoveryCallToolMiddleware(
         }
 
         // Add found tools to session
-        const sessionId = context.connectionId || "default";
         const foundToolNames = results.map(r => r.tool.name);
-        sessionManager.setTools(sessionId, context.namespaceUuid, foundToolNames);
+        sessionManager.setTools(context.sessionId, context.namespaceUuid, foundToolNames);
 
         // Format results as tool definitions
         const toolDefinitions = results.map((result) => ({
           name: result.tool.name,
           description: result.tool.description,
           relevanceScore: Math.round(result.score * 100) / 100,
-          utilityHint: result.tool.description || "",
+          arguments: result.tool.inputSchema || {},
         }));
 
         return {

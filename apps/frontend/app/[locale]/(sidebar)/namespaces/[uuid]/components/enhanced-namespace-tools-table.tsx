@@ -1,6 +1,6 @@
 "use client";
 
-import { NamespaceTool, ToolStatusEnum } from "@repo/zod-types";
+import { NamespaceTool, NamespaceWithServers, ToolStatusEnum } from "@repo/zod-types";
 import {
   Braces,
   Calendar,
@@ -13,6 +13,7 @@ import {
   EyeOff,
   Hash,
   MoreHorizontal,
+  Pin,
   PenSquare,
   RefreshCw,
   RotateCcw,
@@ -96,6 +97,7 @@ interface EnhancedNamespaceTool {
 }
 
 interface EnhancedNamespaceToolsTableProps {
+  namespace: NamespaceWithServers;
   savedTools: NamespaceTool[];
   mcpTools: MCPTool[];
   loading?: boolean;
@@ -130,6 +132,7 @@ const formatAnnotations = (annotations?: Record<string, unknown> | null) => {
 };
 
 export function EnhancedNamespaceToolsTable({
+  namespace,
   savedTools,
   mcpTools,
   loading = false,
@@ -155,6 +158,85 @@ export function EnhancedNamespaceToolsTable({
 
   // Get tRPC utils for cache invalidation
   const utils = trpc.useUtils();
+
+  const [pinnedTools, setPinnedTools] = useState<string[]>(
+    namespace.smart_discovery_pinned_tools || [],
+  );
+
+  React.useEffect(() => {
+    setPinnedTools(namespace.smart_discovery_pinned_tools || []);
+  }, [namespace.smart_discovery_pinned_tools]);
+
+  const pinnedSet = useMemo(() => new Set(pinnedTools), [pinnedTools]);
+  const isSmartDiscoveryEnabled = Boolean(namespace.smart_discovery_enabled);
+
+  const updateNamespaceMutation = trpc.frontend.namespaces.update.useMutation({
+    onSuccess: (response) => {
+      if (response.success) {
+        toast.success(t("namespaces:enhancedToolsTable.pinsUpdated"));
+        utils.frontend.namespaces.get.invalidate({ uuid: namespaceUuid });
+      } else {
+        toast.error(t("namespaces:enhancedToolsTable.pinsUpdateFailed"));
+      }
+    },
+    onError: (error) => {
+      toast.error(t("namespaces:enhancedToolsTable.pinsUpdateFailed"), {
+        description: error.message,
+      });
+    },
+  });
+
+  const getFullToolName = (tool: EnhancedNamespaceTool) => {
+    if (!tool.serverName) return null;
+    return `${tool.serverName}__${tool.name}`;
+  };
+
+  const isPinned = (tool: EnhancedNamespaceTool) => {
+    const full = getFullToolName(tool);
+    if (!full) return false;
+    return pinnedSet.has(full);
+  };
+
+  const mutatePinnedTools = (nextPinned: string[], prevPinned: string[]) => {
+    setPinnedTools(nextPinned);
+    updateNamespaceMutation.mutate(
+      {
+        uuid: namespace.uuid,
+        name: namespace.name,
+        description: namespace.description ?? undefined,
+        mcpServerUuids: namespace.servers.map((s) => s.uuid),
+        user_id: namespace.user_id ?? undefined,
+        smartDiscoveryEnabled: namespace.smart_discovery_enabled,
+        smartDiscoveryDescription: namespace.smart_discovery_description ?? undefined,
+        smartDiscoveryPinnedTools: nextPinned,
+      },
+      {
+        onError: () => {
+          setPinnedTools(prevPinned);
+        },
+      },
+    );
+  };
+
+  const pinTool = (tool: EnhancedNamespaceTool) => {
+    const full = getFullToolName(tool);
+    if (!full) return;
+    if (!isSmartDiscoveryEnabled) {
+      toast.error(t("namespaces:enhancedToolsTable.enableSmartDiscoveryToPin"));
+      return;
+    }
+    if (pinnedSet.has(full)) return;
+    const prev = Array.from(pinnedSet);
+    mutatePinnedTools([...prev, full], prev);
+  };
+
+  const unpinTool = (tool: EnhancedNamespaceTool) => {
+    const full = getFullToolName(tool);
+    if (!full) return;
+    if (!pinnedSet.has(full)) return;
+    const prev = Array.from(pinnedSet);
+    mutatePinnedTools(prev.filter((n) => n !== full), prev);
+  };
 
   // Use namespace-specific tool status update mutation
   const updateToolStatusMutation =
@@ -589,6 +671,43 @@ export function EnhancedNamespaceToolsTable({
     return filtered;
   }, [enhancedTools, searchTerm, sortField, sortDirection]);
 
+  type GroupRow =
+    | { kind: "section"; id: "pinned" | "discovered" | "fromServers"; count: number }
+    | { kind: "tool"; tool: EnhancedNamespaceTool };
+
+  const groupedRows = useMemo(() => {
+    const pinned: EnhancedNamespaceTool[] = [];
+    const discovered: EnhancedNamespaceTool[] = [];
+    const fromServers: EnhancedNamespaceTool[] = [];
+
+    for (const tool of filteredAndSortedTools) {
+      if (isPinned(tool)) {
+        pinned.push(tool);
+        continue;
+      }
+      if (tool.sources.metamcp && !tool.sources.saved) {
+        discovered.push(tool);
+        continue;
+      }
+      fromServers.push(tool);
+    }
+
+    const rows: GroupRow[] = [];
+    if (pinned.length > 0) {
+      rows.push({ kind: "section", id: "pinned", count: pinned.length });
+      pinned.forEach((tool) => rows.push({ kind: "tool", tool }));
+    }
+    if (discovered.length > 0) {
+      rows.push({ kind: "section", id: "discovered", count: discovered.length });
+      discovered.forEach((tool) => rows.push({ kind: "tool", tool }));
+    }
+    if (fromServers.length > 0) {
+      rows.push({ kind: "section", id: "fromServers", count: fromServers.length });
+      fromServers.forEach((tool) => rows.push({ kind: "tool", tool }));
+    }
+    return rows;
+  }, [filteredAndSortedTools, pinnedTools]);
+
   // Render sort icon
   const renderSortIcon = (field: SortField) => {
     if (sortField !== field) return null;
@@ -891,7 +1010,40 @@ export function EnhancedNamespaceToolsTable({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredAndSortedTools.map((tool) => {
+              {groupedRows.map((row) => {
+                if (row.kind === "section") {
+                  const icon =
+                    row.id === "pinned" ? (
+                      <Pin className="h-3 w-3" />
+                    ) : row.id === "discovered" ? (
+                      <Wrench className="h-3 w-3" />
+                    ) : (
+                      <Server className="h-3 w-3" />
+                    );
+
+                  const labelKey =
+                    row.id === "pinned"
+                      ? "namespaces:enhancedToolsTable.sections.pinned"
+                      : row.id === "discovered"
+                        ? "namespaces:enhancedToolsTable.sections.discovered"
+                        : "namespaces:enhancedToolsTable.sections.fromServers";
+
+                  return (
+                    <TableRow
+                      key={`section-${row.id}`}
+                      className="bg-muted/20"
+                    >
+                      <TableCell colSpan={8} className="text-xs font-medium">
+                        <div className="flex items-center gap-2">
+                          {icon}
+                          {t(labelKey, { count: row.count })}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                }
+
+                const tool = row.tool;
                 const toolId = getToolId(tool);
                 const isExpanded = expandedRows.has(toolId);
                 const parameters = getToolParameters(tool);
@@ -909,6 +1061,25 @@ export function EnhancedNamespaceToolsTable({
                   Object.keys(tool.overrideAnnotations).length > 0;
 
                 const indicatorBadges: React.ReactNode[] = [];
+                const pinned = isPinned(tool);
+                if (pinned) {
+                  indicatorBadges.push(
+                    <Tooltip key="pinned-indicator">
+                      <TooltipTrigger asChild>
+                        <Badge
+                          variant="outline"
+                          className="bg-muted/30 text-muted-foreground border-muted/40 px-2 py-0.5 cursor-default"
+                        >
+                          <Pin className="h-3 w-3" />
+                          {t("namespaces:enhancedToolsTable.pinnedBadge")}
+                        </Badge>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">
+                        {t("namespaces:enhancedToolsTable.pinnedTooltip")}
+                      </TooltipContent>
+                    </Tooltip>,
+                  );
+                }
                 if (hasAnyOverride) {
                   indicatorBadges.push(
                     <Tooltip key="override-indicator">
@@ -1085,6 +1256,24 @@ export function EnhancedNamespaceToolsTable({
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
+                            {isSmartDiscoveryEnabled ? (
+                              pinned ? (
+                                <DropdownMenuItem onClick={() => unpinTool(tool)}>
+                                  <Pin className="mr-2 h-4 w-4" />
+                                  {t("namespaces:enhancedToolsTable.unpinTool")}
+                                </DropdownMenuItem>
+                              ) : (
+                                <DropdownMenuItem onClick={() => pinTool(tool)}>
+                                  <Pin className="mr-2 h-4 w-4" />
+                                  {t("namespaces:enhancedToolsTable.pinTool")}
+                                </DropdownMenuItem>
+                              )
+                            ) : (
+                              <DropdownMenuItem disabled>
+                                <Pin className="mr-2 h-4 w-4" />
+                                {t("namespaces:enhancedToolsTable.pinTool")}
+                              </DropdownMenuItem>
+                            )}
                             <DropdownMenuItem
                               onClick={() => toggleRowExpansion(toolId)}
                             >

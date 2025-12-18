@@ -105,7 +105,22 @@ export default function McpServerDetailPage({
     error,
     isLoading,
     refetch,
-  } = trpc.frontend.mcpServers.get.useQuery({ uuid });
+  } = trpc.frontend.mcpServers.get.useQuery(
+    { uuid },
+    {
+      retry: 2,
+      retryDelay: 1000,
+    },
+  );
+
+  // Handle query errors
+  useEffect(() => {
+    if (error) {
+      console.error("Failed to fetch MCP server:", error);
+      // Don't show toast here as it might be a temporary network issue
+      // The error will be handled by the UI rendering logic
+    }
+  }, [error]);
 
   // tRPC mutation for deleting server
   const deleteMutation = trpc.frontend.mcpServers.delete.useMutation({
@@ -153,7 +168,28 @@ export default function McpServerDetailPage({
       console.log("MCP Notification:", notification);
     },
     onStdErrNotification: (notification) => {
-      console.error("MCP StdErr:", notification);
+      // Extract content from stderr notification
+      const content = (notification as any)?.params?.content;
+      if (content) {
+        // Filter out informational messages that are not actual errors
+        const isInformational = 
+          content.includes("running on") ||
+          content.includes("Server running") ||
+          content.includes("listening on") ||
+          content.trim().length === 0;
+        
+        if (isInformational) {
+          // Log informational stderr messages as debug info, not errors
+          console.debug("MCP Server Info:", content.trim());
+        } else {
+          // Log actual error messages
+          console.warn("MCP StdErr:", content);
+        }
+      } else if (notification && Object.keys(notification).length > 0) {
+        // Log the full notification if content is missing but notification exists
+        console.warn("MCP StdErr (raw):", JSON.stringify(notification, null, 2));
+      }
+      // Silently ignore empty notifications to avoid console noise
     },
     enabled: Boolean(
       server &&
@@ -482,7 +518,7 @@ export default function McpServerDetailPage({
                     {t("mcp-servers:detail.type")}:
                   </span>
                   <div className="flex-1 ml-6 flex justify-end">
-                    <Badge variant="info">{server.type.toUpperCase()}</Badge>
+                    <Badge variant="default">{server.type.toUpperCase()}</Badge>
                   </div>
                 </div>
                 <div className="flex justify-between items-center">
@@ -504,7 +540,7 @@ export default function McpServerDetailPage({
                         server.error_status ===
                         McpServerErrorStatusEnum.Enum.ERROR
                           ? "destructive"
-                          : "success"
+                          : "default"
                       }
                     >
                       {server.error_status ===

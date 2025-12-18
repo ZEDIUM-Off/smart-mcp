@@ -226,6 +226,9 @@ export const namespacesTable = pgTable(
       .default(false),
     // Custom description for the "find" tool prompt
     smart_discovery_description: text("smart_discovery_description"),
+    // Pinned tools that are always loaded when smart discovery is enabled
+    // Array of full tool names (e.g., ["ServerName__toolName", ...])
+    smart_discovery_pinned_tools: jsonb("smart_discovery_pinned_tools").$type<string[]>().default([]),
     created_at: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

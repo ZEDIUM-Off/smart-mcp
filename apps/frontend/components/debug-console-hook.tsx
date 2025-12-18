@@ -16,7 +16,10 @@ export function DebugConsoleHook() {
           msg.includes("nextjs.org/docs/messages/sync-dynamic-apis") ||
           msg.includes("params.locale") ||
           msg.includes("params are being enumerated") ||
-          msg.includes("searchParams")
+          msg.includes("searchParams") ||
+          msg.includes("A param property was accessed directly") ||
+          msg.includes("params.uuid") ||
+          msg.includes("should be unwrapped with React.use()")
         ) {
           return false;
         }
@@ -30,7 +33,9 @@ export function DebugConsoleHook() {
           msg.includes("changing an uncontrolled input to be controlled") ||
           msg.includes("params are being enumerated") ||
           msg.includes("searchParams") ||
-          msg.includes("A param property was accessed directly")
+          msg.includes("A param property was accessed directly") ||
+          msg.includes("params.uuid") ||
+          msg.includes("should be unwrapped with React.use()")
         ) {
           // #region agent log
           fetch(

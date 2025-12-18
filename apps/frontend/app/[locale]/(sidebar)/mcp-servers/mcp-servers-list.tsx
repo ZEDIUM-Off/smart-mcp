@@ -546,7 +546,7 @@ export function McpServersList({ onRefresh }: McpServersListProps) {
             <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder={t("mcp-servers:list.searchPlaceholder")}
-              value={globalFilter || ""}
+              value={typeof globalFilter === "string" ? globalFilter : ""}
               onChange={(event) => setGlobalFilter(event.target.value || "")}
               className="pl-8"
             />

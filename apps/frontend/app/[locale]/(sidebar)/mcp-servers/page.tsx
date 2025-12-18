@@ -6,11 +6,14 @@ import {
   createServerFormSchema,
   McpServerTypeEnum,
 } from "@repo/zod-types";
+import type { CreateTRPCReact } from "@trpc/react-query";
+import { createAppRouter } from "@repo/trpc";
 import { ChevronDown, Plus, Server } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
+import { usePageHeader } from "@/components/page-header-context";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -37,15 +40,19 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useTranslations } from "@/hooks/useTranslations";
-import { trpc } from "@/lib/trpc";
+import { trpc as trpcBase } from "@/lib/trpc";
 import { createTranslatedZodResolver } from "@/lib/zod-resolver";
 
 import { ExportImportButtons } from "./export-import-buttons";
 import { McpServersList } from "./mcp-servers-list";
 
+type AppRouter = ReturnType<typeof createAppRouter>;
+const trpc = trpcBase as unknown as CreateTRPCReact<AppRouter, unknown>;
+
 export default function McpServersPage() {
   const { t } = useTranslations();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const { setHeader, clearHeader } = usePageHeader();
 
   const form = useForm<CreateServerFormData>({
     resolver: createTranslatedZodResolver(createServerFormSchema, t),
@@ -141,21 +148,13 @@ export default function McpServersPage() {
     createMutation.mutate(request);
   };
 
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Server className="h-8 w-8 text-primary" />
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">
-              {t("mcp-servers:title")}
-            </h1>
-            <p className="text-muted-foreground">
-              {t("mcp-servers:description")}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
+  useEffect(() => {
+    setHeader({
+      title: t("mcp-servers:title"),
+      description: t("mcp-servers:description"),
+      icon: <Server className="h-5 w-5" />,
+      actions: (
+        <>
           <ExportImportButtons />
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
@@ -459,9 +458,22 @@ export default function McpServersPage() {
               </Form>
             </DialogContent>
           </Dialog>
-        </div>
-      </div>
+        </>
+      ),
+    });
 
+    return () => clearHeader();
+  }, [
+    clearHeader,
+    createMutation.isPending,
+    form,
+    isDialogOpen,
+    setHeader,
+    t,
+  ]);
+
+  return (
+    <div className="space-y-6">
       <McpServersList />
     </div>
   );
