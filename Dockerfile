@@ -82,15 +82,21 @@ COPY --from=builder --chown=nextjs:nodejs /app/apps/backend/drizzle.config.ts ./
 
 # Copy built packages
 COPY --from=builder --chown=nextjs:nodejs /app/packages ./packages
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nextjs:nodejs /app/package.json ./
+COPY --from=builder --chown=nextjs:nodejs /app/pnpm-lock.yaml ./
 COPY --from=builder --chown=nextjs:nodejs /app/pnpm-workspace.yaml ./
+COPY --from=builder --chown=nextjs:nodejs /app/turbo.json ./
 
-# Install production dependencies only
-RUN pnpm install --prod
+# Copy workspace package manifests needed for a deterministic production install
+COPY --from=builder --chown=nextjs:nodejs /app/apps/frontend/package.json ./apps/frontend/
+COPY --from=builder --chown=nextjs:nodejs /app/apps/backend/package.json ./apps/backend/
+COPY --from=builder --chown=nextjs:nodejs /app/packages/eslint-config/package.json ./packages/eslint-config/
+COPY --from=builder --chown=nextjs:nodejs /app/packages/trpc/package.json ./packages/trpc/
+COPY --from=builder --chown=nextjs:nodejs /app/packages/typescript-config/package.json ./packages/typescript-config/
+COPY --from=builder --chown=nextjs:nodejs /app/packages/zod-types/package.json ./packages/zod-types/
 
-# Install drizzle-kit locally in backend for migrations
-RUN cd apps/backend && pnpm add drizzle-kit@0.31.1
+# Install production dependencies only (non-interactive, deterministic)
+RUN pnpm install --prod --frozen-lockfile
 
 # Copy startup script
 COPY --chown=nextjs:nodejs docker-entrypoint.sh ./

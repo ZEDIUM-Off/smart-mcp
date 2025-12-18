@@ -53,6 +53,9 @@ importers:
       dotenv:
         specifier: ^16.5.0
         version: 16.5.0
+      drizzle-kit:
+        specifier: 0.31.1
+        version: 0.31.1
       drizzle-orm:
         specifier: ^0.44.2
         version: 0.44.2(@types/pg@8.15.4)(kysely@0.28.8)(pg@8.16.0)
@@ -111,9 +114,6 @@ importers:
       dotenv-cli:
         specifier: ^8.0.0
         version: 8.0.0
-      drizzle-kit:
-        specifier: ^0.31.1
-        version: 0.31.1
       eslint:
         specifier: ^9.28.0
         version: 9.28.0(jiti@2.4.2)
@@ -7354,7 +7354,7 @@ snapshots:
 
   esbuild-register@3.6.0(esbuild@0.25.5):
     dependencies:
-      debug: 4.4.1
+      debug: 4.4.3
       esbuild: 0.25.5
     transitivePeerDependencies:
       - supports-color
