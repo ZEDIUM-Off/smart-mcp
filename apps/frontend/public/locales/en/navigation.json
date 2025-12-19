@@ -3,6 +3,7 @@
   "exploreMcpServers": "Explore MCP Servers (beta)",
   "mcpServers": "MCP Servers",
   "metamcpNamespaces": "MetaMCP Namespaces",
+  "agents": "Agents",
   "metamcpEndpoints": "MetaMCP Endpoints",
   "mcpInspector": "MCP Inspector",
   "apiKeys": "API Keys",

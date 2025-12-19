@@ -1,13 +1,35 @@
 import {
   CreateNamespaceRequestSchema,
   CreateNamespaceResponseSchema,
+  CreateNamespaceAgentRequestSchema,
+  CreateNamespaceAgentResponseSchema,
   DeleteNamespaceResponseSchema,
+  DeleteNamespaceAgentRequestSchema,
+  DeleteNamespaceAgentResponseSchema,
+  DeleteNamespaceAgentDocumentRequestSchema,
+  DeleteNamespaceAgentDocumentResponseSchema,
+  GetNamespaceAskAgentConfigRequestSchema,
+  GetNamespaceAskAgentConfigResponseSchema,
+  GetNamespaceAgentRequestSchema,
+  GetNamespaceAgentResponseSchema,
   GetNamespaceResponseSchema,
   GetNamespaceToolsRequestSchema,
   GetNamespaceToolsResponseSchema,
+  ListNamespaceAgentsRequestSchema,
+  ListNamespaceAgentsResponseSchema,
+  ListNamespaceAgentDocumentsRequestSchema,
+  ListNamespaceAgentDocumentsResponseSchema,
   ListNamespacesResponseSchema,
   RefreshNamespaceToolsRequestSchema,
   RefreshNamespaceToolsResponseSchema,
+  SetActiveAskAgentRequestSchema,
+  SetActiveAskAgentResponseSchema,
+  UploadNamespaceAgentDocumentRequestSchema,
+  UploadNamespaceAgentDocumentResponseSchema,
+  UpdateNamespaceAskAgentConfigRequestSchema,
+  UpdateNamespaceAskAgentConfigResponseSchema,
+  UpdateNamespaceAgentRequestSchema,
+  UpdateNamespaceAgentResponseSchema,
   UpdateNamespaceRequestSchema,
   UpdateNamespaceResponseSchema,
   UpdateNamespaceServerStatusRequestSchema,
@@ -53,6 +75,50 @@ export const createNamespacesRouter = (
       input: z.infer<typeof UpdateNamespaceRequestSchema>,
       userId: string,
     ) => Promise<z.infer<typeof UpdateNamespaceResponseSchema>>;
+    getAskAgentConfig: (
+      input: z.infer<typeof GetNamespaceAskAgentConfigRequestSchema>,
+      userId: string,
+    ) => Promise<z.infer<typeof GetNamespaceAskAgentConfigResponseSchema>>;
+    updateAskAgentConfig: (
+      input: z.infer<typeof UpdateNamespaceAskAgentConfigRequestSchema>,
+      userId: string,
+    ) => Promise<z.infer<typeof UpdateNamespaceAskAgentConfigResponseSchema>>;
+    getAgent: (
+      input: z.infer<typeof GetNamespaceAgentRequestSchema>,
+      userId: string,
+    ) => Promise<z.infer<typeof GetNamespaceAgentResponseSchema>>;
+    listAgents: (
+      input: z.infer<typeof ListNamespaceAgentsRequestSchema>,
+      userId: string,
+    ) => Promise<z.infer<typeof ListNamespaceAgentsResponseSchema>>;
+    createAgent: (
+      input: z.infer<typeof CreateNamespaceAgentRequestSchema>,
+      userId: string,
+    ) => Promise<z.infer<typeof CreateNamespaceAgentResponseSchema>>;
+    updateAgent: (
+      input: z.infer<typeof UpdateNamespaceAgentRequestSchema>,
+      userId: string,
+    ) => Promise<z.infer<typeof UpdateNamespaceAgentResponseSchema>>;
+    deleteAgent: (
+      input: z.infer<typeof DeleteNamespaceAgentRequestSchema>,
+      userId: string,
+    ) => Promise<z.infer<typeof DeleteNamespaceAgentResponseSchema>>;
+    setActiveAskAgent: (
+      input: z.infer<typeof SetActiveAskAgentRequestSchema>,
+      userId: string,
+    ) => Promise<z.infer<typeof SetActiveAskAgentResponseSchema>>;
+    listAgentDocuments: (
+      input: z.infer<typeof ListNamespaceAgentDocumentsRequestSchema>,
+      userId: string,
+    ) => Promise<z.infer<typeof ListNamespaceAgentDocumentsResponseSchema>>;
+    uploadAgentDocument: (
+      input: z.infer<typeof UploadNamespaceAgentDocumentRequestSchema>,
+      userId: string,
+    ) => Promise<z.infer<typeof UploadNamespaceAgentDocumentResponseSchema>>;
+    deleteAgentDocument: (
+      input: z.infer<typeof DeleteNamespaceAgentDocumentRequestSchema>,
+      userId: string,
+    ) => Promise<z.infer<typeof DeleteNamespaceAgentDocumentResponseSchema>>;
     updateServerStatus: (
       input: z.infer<typeof UpdateNamespaceServerStatusRequestSchema>,
       userId: string,
@@ -117,6 +183,94 @@ export const createNamespacesRouter = (
       .output(UpdateNamespaceResponseSchema)
       .mutation(async ({ input, ctx }) => {
         return await implementations.update(input, ctx.user.id);
+      }),
+
+    // Protected: Get ask-agent config for a namespace
+    getAskAgentConfig: protectedProcedure
+      .input(GetNamespaceAskAgentConfigRequestSchema)
+      .output(GetNamespaceAskAgentConfigResponseSchema)
+      .query(async ({ input, ctx }) => {
+        return await implementations.getAskAgentConfig(input, ctx.user.id);
+      }),
+
+    // Protected: Update ask-agent config for a namespace
+    updateAskAgentConfig: protectedProcedure
+      .input(UpdateNamespaceAskAgentConfigRequestSchema)
+      .output(UpdateNamespaceAskAgentConfigResponseSchema)
+      .mutation(async ({ input, ctx }) => {
+        return await implementations.updateAskAgentConfig(input, ctx.user.id);
+      }),
+
+    // Protected: Get agent by UUID
+    getAgent: protectedProcedure
+      .input(GetNamespaceAgentRequestSchema)
+      .output(GetNamespaceAgentResponseSchema)
+      .query(async ({ input, ctx }) => {
+        return await implementations.getAgent(input, ctx.user.id);
+      }),
+
+    // Protected: List agents for a namespace
+    listAgents: protectedProcedure
+      .input(ListNamespaceAgentsRequestSchema)
+      .output(ListNamespaceAgentsResponseSchema)
+      .query(async ({ input, ctx }) => {
+        return await implementations.listAgents(input, ctx.user.id);
+      }),
+
+    // Protected: Create agent for a namespace
+    createAgent: protectedProcedure
+      .input(CreateNamespaceAgentRequestSchema)
+      .output(CreateNamespaceAgentResponseSchema)
+      .mutation(async ({ input, ctx }) => {
+        return await implementations.createAgent(input, ctx.user.id);
+      }),
+
+    // Protected: Update an agent
+    updateAgent: protectedProcedure
+      .input(UpdateNamespaceAgentRequestSchema)
+      .output(UpdateNamespaceAgentResponseSchema)
+      .mutation(async ({ input, ctx }) => {
+        return await implementations.updateAgent(input, ctx.user.id);
+      }),
+
+    // Protected: Delete an agent
+    deleteAgent: protectedProcedure
+      .input(DeleteNamespaceAgentRequestSchema)
+      .output(DeleteNamespaceAgentResponseSchema)
+      .mutation(async ({ input, ctx }) => {
+        return await implementations.deleteAgent(input, ctx.user.id);
+      }),
+
+    // Protected: Set active ask agent for a namespace
+    setActiveAskAgent: protectedProcedure
+      .input(SetActiveAskAgentRequestSchema)
+      .output(SetActiveAskAgentResponseSchema)
+      .mutation(async ({ input, ctx }) => {
+        return await implementations.setActiveAskAgent(input, ctx.user.id);
+      }),
+
+    // Protected: List docs for an agent
+    listAgentDocuments: protectedProcedure
+      .input(ListNamespaceAgentDocumentsRequestSchema)
+      .output(ListNamespaceAgentDocumentsResponseSchema)
+      .query(async ({ input, ctx }) => {
+        return await implementations.listAgentDocuments(input, ctx.user.id);
+      }),
+
+    // Protected: Upload doc for an agent (text-only MVP)
+    uploadAgentDocument: protectedProcedure
+      .input(UploadNamespaceAgentDocumentRequestSchema)
+      .output(UploadNamespaceAgentDocumentResponseSchema)
+      .mutation(async ({ input, ctx }) => {
+        return await implementations.uploadAgentDocument(input, ctx.user.id);
+      }),
+
+    // Protected: Delete doc
+    deleteAgentDocument: protectedProcedure
+      .input(DeleteNamespaceAgentDocumentRequestSchema)
+      .output(DeleteNamespaceAgentDocumentResponseSchema)
+      .mutation(async ({ input, ctx }) => {
+        return await implementations.deleteAgentDocument(input, ctx.user.id);
       }),
 
     // Protected: Update server status within namespace

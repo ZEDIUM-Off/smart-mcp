@@ -51,6 +51,7 @@ export const NamespaceSchema = z.object({
   smart_discovery_enabled: z.boolean(),
   smart_discovery_description: z.string().nullable().optional(),
   smart_discovery_pinned_tools: z.array(z.string()).optional().default([]),
+  ask_agent_uuid: z.string().uuid().nullable().optional(),
 });
 
 // Server within namespace schema - extends McpServerSchema with namespace-specific status
@@ -190,6 +191,172 @@ export const RefreshNamespaceToolsResponseSchema = z.object({
   mappingsCreated: z.number().optional(),
 });
 
+// Namespace agent config (Smart Discovery: Ask Agent)
+export const NamespaceAgentTypeSchema = z.enum(["ask"]);
+
+export const NamespaceAgentSchema = z.object({
+  uuid: z.string().uuid(),
+  namespace_uuid: z.string().uuid(),
+  agent_type: NamespaceAgentTypeSchema,
+  name: z.string(),
+  enabled: z.boolean(),
+  model: z.string(),
+  system_prompt: z.string(),
+  references: z.record(z.any()),
+  allowed_tools: z.array(z.string()),
+  denied_tools: z.array(z.string()),
+  max_tool_calls: z.number(),
+  expose_limit: z.number(),
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+
+export const NamespaceAgentDocumentSchema = z.object({
+  uuid: z.string().uuid(),
+  agent_uuid: z.string().uuid(),
+  filename: z.string(),
+  mime: z.string(),
+  token_count: z.number(),
+  content: z.string(),
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+
+export const ListNamespaceAgentsRequestSchema = z.object({
+  namespaceUuid: z.string().uuid(),
+});
+
+export const ListNamespaceAgentsResponseSchema = z.object({
+  success: z.boolean(),
+  data: z.array(NamespaceAgentSchema).optional(),
+  message: z.string().optional(),
+});
+
+export const CreateNamespaceAgentRequestSchema = z.object({
+  namespaceUuid: z.string().uuid(),
+  name: z.string().min(1),
+  enabled: z.boolean().optional(),
+  model: z.string().optional(),
+  system_prompt: z.string().optional(),
+  references: z.record(z.any()).optional(),
+  denied_tools: z.array(z.string()).optional(),
+  max_tool_calls: z.number().optional(),
+  expose_limit: z.number().optional(),
+});
+
+export const CreateNamespaceAgentResponseSchema = z.object({
+  success: z.boolean(),
+  data: NamespaceAgentSchema.optional(),
+  message: z.string().optional(),
+});
+
+export const UpdateNamespaceAgentRequestSchema = z.object({
+  agentUuid: z.string().uuid(),
+  name: z.string().min(1).optional(),
+  enabled: z.boolean().optional(),
+  model: z.string().optional(),
+  system_prompt: z.string().optional(),
+  references: z.record(z.any()).optional(),
+  denied_tools: z.array(z.string()).optional(),
+  max_tool_calls: z.number().optional(),
+  expose_limit: z.number().optional(),
+});
+
+export const UpdateNamespaceAgentResponseSchema = z.object({
+  success: z.boolean(),
+  data: NamespaceAgentSchema.optional(),
+  message: z.string().optional(),
+});
+
+export const DeleteNamespaceAgentRequestSchema = z.object({
+  agentUuid: z.string().uuid(),
+});
+
+export const DeleteNamespaceAgentResponseSchema = z.object({
+  success: z.boolean(),
+  message: z.string().optional(),
+});
+
+export const SetActiveAskAgentRequestSchema = z.object({
+  namespaceUuid: z.string().uuid(),
+  agentUuid: z.string().uuid().nullable(),
+});
+
+export const SetActiveAskAgentResponseSchema = z.object({
+  success: z.boolean(),
+  message: z.string().optional(),
+});
+
+export const ListNamespaceAgentDocumentsRequestSchema = z.object({
+  agentUuid: z.string().uuid(),
+});
+
+export const ListNamespaceAgentDocumentsResponseSchema = z.object({
+  success: z.boolean(),
+  data: z.array(NamespaceAgentDocumentSchema).optional(),
+  message: z.string().optional(),
+});
+
+export const UploadNamespaceAgentDocumentRequestSchema = z.object({
+  agentUuid: z.string().uuid(),
+  filename: z.string().min(1),
+  mime: z.string().optional(),
+  content: z.string().min(1),
+});
+
+export const UploadNamespaceAgentDocumentResponseSchema = z.object({
+  success: z.boolean(),
+  data: NamespaceAgentDocumentSchema.optional(),
+  message: z.string().optional(),
+});
+
+export const DeleteNamespaceAgentDocumentRequestSchema = z.object({
+  docUuid: z.string().uuid(),
+});
+
+export const DeleteNamespaceAgentDocumentResponseSchema = z.object({
+  success: z.boolean(),
+  message: z.string().optional(),
+});
+
+export const GetNamespaceAgentRequestSchema = z.object({
+  agentUuid: z.string().uuid(),
+});
+
+export const GetNamespaceAgentResponseSchema = z.object({
+  success: z.boolean(),
+  data: NamespaceAgentSchema.optional(),
+  message: z.string().optional(),
+});
+
+export const GetNamespaceAskAgentConfigRequestSchema = z.object({
+  namespaceUuid: z.string().uuid(),
+});
+
+export const GetNamespaceAskAgentConfigResponseSchema = z.object({
+  success: z.boolean(),
+  data: NamespaceAgentSchema.optional(),
+  message: z.string().optional(),
+});
+
+export const UpdateNamespaceAskAgentConfigRequestSchema = z.object({
+  namespaceUuid: z.string().uuid(),
+  enabled: z.boolean().optional(),
+  model: z.string().optional(),
+  system_prompt: z.string().optional(),
+  references: z.record(z.any()).optional(),
+  allowed_tools: z.array(z.string()).optional(),
+  denied_tools: z.array(z.string()).optional(),
+  max_tool_calls: z.number().optional(),
+  expose_limit: z.number().optional(),
+});
+
+export const UpdateNamespaceAskAgentConfigResponseSchema = z.object({
+  success: z.boolean(),
+  data: NamespaceAgentSchema.optional(),
+  message: z.string().optional(),
+});
+
 // Type exports
 export type CreateNamespaceRequest = z.infer<
   typeof CreateNamespaceRequestSchema
@@ -240,6 +407,52 @@ export type UpdateNamespaceToolOverridesRequest = z.infer<
 >;
 export type UpdateNamespaceToolOverridesResponse = z.infer<
   typeof UpdateNamespaceToolOverridesResponseSchema
+>;
+
+export type NamespaceAgentType = z.infer<typeof NamespaceAgentTypeSchema>;
+export type NamespaceAgent = z.infer<typeof NamespaceAgentSchema>;
+export type NamespaceAgentDocument = z.infer<typeof NamespaceAgentDocumentSchema>;
+export type ListNamespaceAgentsRequest = z.infer<typeof ListNamespaceAgentsRequestSchema>;
+export type ListNamespaceAgentsResponse = z.infer<typeof ListNamespaceAgentsResponseSchema>;
+export type CreateNamespaceAgentRequest = z.infer<typeof CreateNamespaceAgentRequestSchema>;
+export type CreateNamespaceAgentResponse = z.infer<typeof CreateNamespaceAgentResponseSchema>;
+export type UpdateNamespaceAgentRequest = z.infer<typeof UpdateNamespaceAgentRequestSchema>;
+export type UpdateNamespaceAgentResponse = z.infer<typeof UpdateNamespaceAgentResponseSchema>;
+export type DeleteNamespaceAgentRequest = z.infer<typeof DeleteNamespaceAgentRequestSchema>;
+export type DeleteNamespaceAgentResponse = z.infer<typeof DeleteNamespaceAgentResponseSchema>;
+export type SetActiveAskAgentRequest = z.infer<typeof SetActiveAskAgentRequestSchema>;
+export type SetActiveAskAgentResponse = z.infer<typeof SetActiveAskAgentResponseSchema>;
+export type ListNamespaceAgentDocumentsRequest = z.infer<
+  typeof ListNamespaceAgentDocumentsRequestSchema
+>;
+export type ListNamespaceAgentDocumentsResponse = z.infer<
+  typeof ListNamespaceAgentDocumentsResponseSchema
+>;
+export type UploadNamespaceAgentDocumentRequest = z.infer<
+  typeof UploadNamespaceAgentDocumentRequestSchema
+>;
+export type UploadNamespaceAgentDocumentResponse = z.infer<
+  typeof UploadNamespaceAgentDocumentResponseSchema
+>;
+export type DeleteNamespaceAgentDocumentRequest = z.infer<
+  typeof DeleteNamespaceAgentDocumentRequestSchema
+>;
+export type DeleteNamespaceAgentDocumentResponse = z.infer<
+  typeof DeleteNamespaceAgentDocumentResponseSchema
+>;
+export type GetNamespaceAgentRequest = z.infer<typeof GetNamespaceAgentRequestSchema>;
+export type GetNamespaceAgentResponse = z.infer<typeof GetNamespaceAgentResponseSchema>;
+export type GetNamespaceAskAgentConfigRequest = z.infer<
+  typeof GetNamespaceAskAgentConfigRequestSchema
+>;
+export type GetNamespaceAskAgentConfigResponse = z.infer<
+  typeof GetNamespaceAskAgentConfigResponseSchema
+>;
+export type UpdateNamespaceAskAgentConfigRequest = z.infer<
+  typeof UpdateNamespaceAskAgentConfigRequestSchema
+>;
+export type UpdateNamespaceAskAgentConfigResponse = z.infer<
+  typeof UpdateNamespaceAskAgentConfigResponseSchema
 >;
 
 // Repository-specific schemas

@@ -28,6 +28,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useTranslations } from "@/hooks/useTranslations";
@@ -49,6 +56,7 @@ export function EditNamespace({
 }: EditNamespaceProps) {
   const [isUpdating, setIsUpdating] = useState(false);
   const [selectedServerUuids, setSelectedServerUuids] = useState<string[]>([]);
+  const [activeAskAgentUuid, setActiveAskAgentUuid] = useState<string>("none");
   const { t } = useTranslations();
 
   // Get tRPC utils for cache invalidation
@@ -100,6 +108,22 @@ export function EditNamespace({
     },
   });
 
+  const { data: agentsResp } = trpc.frontend.namespaces.listAgents.useQuery(
+    { namespaceUuid: namespace?.uuid ?? "" },
+    { enabled: !!namespace?.uuid && isOpen },
+  );
+  const agents = agentsResp?.success ? agentsResp.data ?? [] : [];
+
+  const setActiveAskAgentMutation =
+    trpc.frontend.namespaces.setActiveAskAgent.useMutation({
+      onError: (error) => {
+        console.error("Error setting active ask agent:", error);
+        toast.error(t("namespaces:edit.updateFailed"), {
+          description: error.message || t("namespaces:edit.unexpectedError"),
+        });
+      },
+    });
+
   const editForm = useForm<EditNamespaceFormData>({
     resolver: createTranslatedZodResolver(editNamespaceFormSchema, t),
     defaultValues: {
@@ -127,6 +151,7 @@ export function EditNamespace({
         smartDiscoveryDescription: namespace.smart_discovery_description || "",
       });
       setSelectedServerUuids(serverUuids);
+      setActiveAskAgentUuid(namespace.ask_agent_uuid ?? "none");
     }
   }, [namespace, isOpen, editForm]);
 
@@ -160,6 +185,14 @@ export function EditNamespace({
         smartDiscoveryDescription: data.smartDiscoveryDescription,
       };
 
+      // Set active ask agent selection (only meaningful when smart discovery is enabled)
+      if (data.smartDiscoveryEnabled) {
+        setActiveAskAgentMutation.mutate({
+          namespaceUuid: namespace.uuid,
+          agentUuid: activeAskAgentUuid === "none" ? null : activeAskAgentUuid,
+        });
+      }
+
       // Use tRPC mutation instead of direct fetch
       updateNamespaceMutation.mutate(apiPayload);
     } catch (error) {
@@ -185,6 +218,7 @@ export function EditNamespace({
       smartDiscoveryDescription: "",
     });
     setSelectedServerUuids([]);
+    setActiveAskAgentUuid("none");
   };
 
   if (!namespace) {
@@ -318,6 +352,41 @@ export function EditNamespace({
                   {t("namespaces:edit.smartDiscoveryDescriptionHelp") ||
                     "This description will be used to guide the agent when searching for tools."}
                 </p>
+              </div>
+            )}
+
+            {editForm.watch("smartDiscoveryEnabled") && (
+              <div className="flex flex-col gap-3 rounded-lg border p-4">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <div className="text-sm font-medium">
+                      {t("namespaces:edit.askAgentLabel") || "Ask Agent"}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {t("namespaces:edit.askAgentHelp") ||
+                        "Select which ask agent is active for this namespace."}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium">
+                    {t("namespaces:edit.askAgentActive") || "Active ask agent"}
+                  </label>
+                  <Select value={activeAskAgentUuid} onValueChange={setActiveAskAgentUuid}>
+                    <SelectTrigger className="w-full" disabled={isUpdating}>
+                      <SelectValue placeholder="Select an agent" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      {agents.map((a) => (
+                        <SelectItem key={a.uuid} value={a.uuid}>
+                          {a.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             )}
 

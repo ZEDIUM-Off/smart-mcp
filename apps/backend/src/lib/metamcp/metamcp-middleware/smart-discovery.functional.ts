@@ -14,8 +14,15 @@ import { Tool } from "@modelcontextprotocol/sdk/types.js";
 import { eq } from "drizzle-orm";
 
 import { db } from "../../../db/index";
+import { namespaceAgentsRepository } from "../../../db/repositories";
 import { namespacesTable } from "../../../db/schema";
 import { discoveryService } from "../../discovery";
+import {
+  AskAgent,
+  DiscoveryToolSearch,
+  OpenAiLlmAdapter,
+} from "../../ask-agent";
+import { namespaceAgentDocumentsRepository } from "../../../db/repositories";
 import {
   type CallToolHandler,
   CallToolMiddleware,
@@ -142,97 +149,143 @@ class DiscoveredToolsSessionManager {
 
 const sessionManager = new DiscoveredToolsSessionManager();
 
-function buildFindToolDescription(tools: Tool[], namespaceDescription?: string | null): string {
-  const lines: string[] = [];
+function getServerOverview(tools: Tool[]): {
+  totalTools: number;
+  servers: Array<{ server: string; count: number }>;
+} {
+  const filtered = (tools || []).filter(
+    (t) =>
+      t?.name &&
+      t.name !== "metamcp__find" &&
+      t.name !== "metamcp__ask",
+  );
 
+  const groups = new Map<string, number>();
+  for (const tool of filtered) {
+    const idx = tool.name.indexOf("__");
+    const server = idx === -1 ? "unknown" : tool.name.slice(0, idx);
+    groups.set(server, (groups.get(server) ?? 0) + 1);
+  }
+
+  const servers = Array.from(groups.entries())
+    .map(([server, count]) => ({ server, count }))
+    .sort((a, b) => a.server.localeCompare(b.server));
+
+  return { totalTools: filtered.length, servers };
+}
+
+function buildAskToolDescription(
+  tools: Tool[],
+  namespaceDescription?: string | null,
+): string {
+  const overview = getServerOverview(tools);
+
+  const lines: string[] = [];
   lines.push(
-    "## Smart Discovery",
+    "## Smart Discovery: Ask Agent",
     "",
-    "Smart Discovery is enabled for this namespace. Use `metamcp__find` to discover the right tools for a task.",
+    "Use `metamcp__ask` to get a fast, actionable report for this namespace. The agent can (optionally) execute allowed tools and then recommend / expose the most useful tools for follow-up calls.",
+    "",
+    `**Registry overview:** ${overview.totalTools} tool(s) across ${overview.servers.length} server(s).`,
     "",
     "### How to Use",
     "",
-    "Call `metamcp__find` with a natural-language query describing what you want to accomplish. The tool searches semantically across tool names and descriptions.",
+    "Call `metamcp__ask` with a natural-language `query` describing your goal. You may optionally limit tool execution with `maxToolCalls`.",
     "",
-    "### Examples",
-    "",
-    "```",
-    'metamcp__find({ query: "take a screenshot" })',
-    'metamcp__find({ query: "fetch a url" })',
-    'metamcp__find({ query: "query postgres database" })',
-    'metamcp__find({ query: "read and write files" })',
-    "```",
+    "### Servers (high-level)",
     "",
   );
+
+  if (overview.servers.length === 0) {
+    lines.push("- (no servers available)");
+  } else {
+    for (const s of overview.servers) {
+      lines.push(`- \`${s.server}\` (${s.count} tool(s))`);
+    }
+  }
+  lines.push("");
 
   if (namespaceDescription && namespaceDescription.trim()) {
     lines.push("### Namespace Context", "", namespaceDescription.trim(), "");
   }
 
-  const filtered = (tools || []).filter((t) => t?.name && t.name !== "metamcp__find");
-  if (filtered.length === 0) {
-    lines.push("### Available Tools", "", "No tools are currently available to index in this namespace.");
-    return lines.join("\n");
-  }
-
-  // Group by server prefix when available (serverName__toolName)
-  const groups = new Map<string, Tool[]>();
-  for (const tool of filtered) {
-    const idx = tool.name.indexOf("__");
-    const server = idx === -1 ? "unknown" : tool.name.slice(0, idx);
-    const arr = groups.get(server) ?? [];
-    arr.push(tool);
-    groups.set(server, arr);
-  }
-
   lines.push(
-    "### Available Tools",
+    "### Examples",
     "",
-    `**Registry overview:** ${filtered.length} tool(s) across ${groups.size} server(s).`,
+    "```",
+    'metamcp__ask({ query: "What can I do in this namespace?" })',
+    'metamcp__ask({ query: "Find the best tool(s) to take a screenshot", maxToolCalls: 0 })',
+    'metamcp__ask({ query: "Debug why my build fails", maxToolCalls: 2 })',
+    "```",
     "",
-  );
-
-  // Stable output: sort servers + tools
-  const serverNames = Array.from(groups.keys()).sort((a, b) => a.localeCompare(b));
-  for (const serverName of serverNames) {
-    const serverTools = (groups.get(serverName) ?? []).slice().sort((a, b) => a.name.localeCompare(b.name));
-    lines.push(`#### Server: \`${serverName}\` (${serverTools.length} tool(s))`, "");
-    for (const tool of serverTools) {
-      const idx = tool.name.indexOf("__");
-      const shortName = idx === -1 ? tool.name : tool.name.slice(idx + 2);
-      const desc = (tool.description || "").trim();
-      lines.push(`- **\`${shortName}\`**: ${desc || "No description."}`);
-    }
-    lines.push("");
-  }
-
-  lines.push(
     "### What You Will Get Back",
     "",
-    "The tool returns a JSON object with:",
+    "A JSON report with:",
+    "- `answer`: The agent's answer",
+    "- `toolCallsExecuted`: Tools it executed (if any) + short outputs",
+    "- `suggestedTools`: Tools to use next (with example calls / params)",
+    "- `exposedTools`: Tools added to your session (they will appear in `tools/list` afterwards)",
+    "- `followups`: Clarifying questions / next steps",
+  );
+
+  return lines.join("\n");
+}
+
+function buildFindToolDescription(
+  tools: Tool[],
+  namespaceDescription?: string | null,
+): string {
+  const overview = getServerOverview(tools);
+  const lines: string[] = [];
+
+  lines.push(
+    "## Smart Discovery: Find Tool",
     "",
-    "- `message`: A summary message",
-    "- `query`: Your original query",
-    "- `tools`: An array of matching tool definitions, each containing:",
-    "  - `name`: The full tool name (e.g., `ServerName__toolName`)",
-    "  - `description`: Tool description",
-    "  - `arguments`: The tool's input schema (JSON Schema)",
-    "  - `relevanceScore`: Semantic relevance score (0-1)",
+    "Use `metamcp__find` to discover the right tools for a task without loading the full tool registry into context.",
     "",
-    "After receiving the results, you can call any of the returned tools directly by name.",
+    `**Registry overview:** ${overview.totalTools} tool(s) across ${overview.servers.length} server(s).`,
+    "",
+    "### How to Use",
+    "",
+    "Call `metamcp__find` with a natural-language `query` describing what you want to accomplish. Optionally set `limit` (default 5, max 20).",
+    "",
+    "### Servers (high-level)",
     "",
   );
 
-  // Guard against pathological sizes while still being "as full as possible"
-  const text = lines.join("\n");
-  const MAX_CHARS = 24000;
-  if (text.length > MAX_CHARS) {
-    return (
-      text.slice(0, MAX_CHARS) +
-      `\n\n> **Note:** Description truncated (exceeded ${MAX_CHARS} characters). Use \`metamcp__find\` queries to discover specific tools.`
-    );
+  if (overview.servers.length === 0) {
+    lines.push("- (no servers available)");
+  } else {
+    for (const s of overview.servers) {
+      lines.push(`- \`${s.server}\` (${s.count} tool(s))`);
+    }
   }
-  return text;
+  lines.push("");
+
+  if (namespaceDescription && namespaceDescription.trim()) {
+    lines.push("### Namespace Context", "", namespaceDescription.trim(), "");
+  }
+
+  lines.push(
+    "### Examples",
+    "",
+    "```",
+    'metamcp__find({ query: "take a screenshot" })',
+    'metamcp__find({ query: "fetch a url", limit: 10 })',
+    'metamcp__find({ query: "read and write files" })',
+    "```",
+    "",
+    "### What You Will Get Back",
+    "",
+    "A JSON object with:",
+    "- `message`: Summary",
+    "- `query`: Your original query",
+    "- `tools`: Matching tool definitions (name/description/input schema + relevanceScore)",
+    "",
+    "The returned tools are added to your session, so you can call them directly by name afterwards.",
+  );
+
+  return lines.join("\n");
 }
 
 /**
@@ -282,6 +335,36 @@ After receiving the results, you can call any of the returned tools directly by 
         type: "number",
         description: "Maximum number of tools to return (default: 5, max: 20)",
         default: 5,
+      },
+    },
+    required: ["query"],
+  },
+});
+
+const getAskTool = (description?: string | null): Tool => ({
+  name: "metamcp__ask",
+  description:
+    description ||
+    `## Smart Discovery: Ask Agent
+
+Use \`metamcp__ask\` to get a report, recommendations, and (optionally) execute tools to answer faster.`,
+  inputSchema: {
+    type: "object",
+    properties: {
+      query: {
+        type: "string",
+        description:
+          "Natural language question or task request for this namespace",
+      },
+      maxToolCalls: {
+        type: "number",
+        description:
+          "Maximum number of tool calls the agent may execute (overrides agent config, default: config value)",
+      },
+      exposeLimit: {
+        type: "number",
+        description:
+          "Maximum number of tools to expose in-session after answering (overrides agent config, default: config value)",
       },
     },
     required: ["query"],
@@ -410,8 +493,11 @@ export function createSmartDiscoveryListToolsMiddleware(
       const allToolNames = new Set<string>();
       const finalTools: Tool[] = [];
       
-      // Add find tool first
+      // Add ask + find tools first
       const findDescription = buildFindToolDescription(response.tools || [], status.description);
+      const askDescription = buildAskToolDescription(response.tools || [], status.description);
+      finalTools.push(getAskTool(askDescription));
+      allToolNames.add("metamcp__ask");
       finalTools.push(getFindTool(findDescription));
       allToolNames.add("metamcp__find");
 
@@ -452,18 +538,18 @@ export function createSmartDiscoveryCallToolMiddleware(
     return async (request, context: MetaMCPHandlerContext) => {
       const toolName = request.params.name;
 
-      // Check if this is a call to the "find" tool
-      if (toolName !== "metamcp__find") {
+      // Intercept smart discovery synthetic tools
+      if (toolName !== "metamcp__find" && toolName !== "metamcp__ask") {
         // Not a find tool call - pass through to next handler
         return handler(request, context);
       }
 
-      // This is a call to the "find" tool
+      // This is a call to a synthetic smart discovery tool
       // Check if smart discovery is enabled
       const status = await getSmartDiscoveryStatus(context.namespaceUuid, useCache);
 
       if (!status.enabled) {
-        // Smart discovery not enabled but someone tried to call "find"
+        // Smart discovery not enabled but someone tried to call a synthetic tool
         // This shouldn't happen normally, but handle gracefully
         return {
           content: [
@@ -471,7 +557,8 @@ export function createSmartDiscoveryCallToolMiddleware(
               type: "text",
               text: JSON.stringify({
                 error: "Smart Discovery is not enabled for this namespace",
-                message: "The 'find' tool is only available when Smart Discovery mode is enabled.",
+                message:
+                  "Smart Discovery synthetic tools are only available when Smart Discovery mode is enabled.",
               }),
             },
           ],
@@ -479,11 +566,112 @@ export function createSmartDiscoveryCallToolMiddleware(
         };
       }
 
-      // Extract query from arguments
-      const args = request.params.arguments as { query?: string; limit?: number } | undefined;
-      const query = args?.query;
-      const limit = Math.min(args?.limit ?? 5, 20); // Cap at 20
+      // Handle "find"
+      if (toolName === "metamcp__find") {
+        // Extract query from arguments
+        const args = request.params.arguments as
+          | { query?: string; limit?: number }
+          | undefined;
+        const query = args?.query;
+        const limit = Math.min(args?.limit ?? 5, 20); // Cap at 20
 
+        if (!query || typeof query !== "string") {
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify({
+                  error: "Missing required parameter: query",
+                  message:
+                    "Please provide a 'query' parameter describing what tools you're looking for.",
+                }),
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        try {
+          // Perform semantic search
+          const results = await discoveryService.search(
+            context.namespaceUuid,
+            query,
+            limit,
+          );
+
+          if (results.length === 0) {
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: JSON.stringify({
+                    message: "No tools found matching your query",
+                    query: query,
+                    suggestion:
+                      "Try a different search term or be more specific about what you want to accomplish.",
+                  }),
+                },
+              ],
+            };
+          }
+
+          // Add found tools to session
+          const foundToolNames = results.map((r) => r.tool.name);
+          sessionManager.setTools(
+            context.sessionId,
+            context.namespaceUuid,
+            foundToolNames,
+          );
+
+          // Format results as tool definitions
+          const toolDefinitions = results.map((result) => ({
+            name: result.tool.name,
+            description: result.tool.description,
+            relevanceScore: Math.round(result.score * 100) / 100,
+            arguments: result.tool.inputSchema || {},
+          }));
+
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(
+                  {
+                    message: `Found ${results.length} tool(s) matching your query`,
+                    query: query,
+                    tools: toolDefinitions,
+                    usage:
+                      "These tools have been added to your session. You can now call them directly.",
+                  },
+                  null,
+                  2,
+                ),
+              },
+            ],
+          };
+        } catch (error) {
+          console.error(`[SmartDiscovery] Error searching tools:`, error);
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify({
+                  error: "Failed to search for tools",
+                  message:
+                    error instanceof Error ? error.message : "Unknown error occurred",
+                }),
+              },
+            ],
+            isError: true,
+          };
+        }
+      }
+
+      // Handle "ask"
+      const args = request.params.arguments as
+        | { query?: string; maxToolCalls?: number; exposeLimit?: number }
+        | undefined;
+      const query = args?.query;
       if (!query || typeof query !== "string") {
         return {
           content: [
@@ -491,7 +679,25 @@ export function createSmartDiscoveryCallToolMiddleware(
               type: "text",
               text: JSON.stringify({
                 error: "Missing required parameter: query",
-                message: "Please provide a 'query' parameter describing what tools you're looking for.",
+                message:
+                  "Please provide a 'query' parameter describing what you want to achieve.",
+              }),
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      const apiKey = process.env.OPENAI_API_KEY;
+      if (!apiKey) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                error: "OPENAI_API_KEY is not configured",
+                message:
+                  "Set OPENAI_API_KEY to enable metamcp__ask orchestration.",
               }),
             },
           ],
@@ -500,62 +706,135 @@ export function createSmartDiscoveryCallToolMiddleware(
       }
 
       try {
-        // Perform semantic search
-        const results = await discoveryService.search(
-          context.namespaceUuid,
-          query,
-          limit
-        );
+        // Pick active agent for this namespace (fallback: create a default one)
+        const [ns] =
+          (await db
+            .select({
+              ask_agent_uuid: namespacesTable.ask_agent_uuid,
+            })
+            .from(namespacesTable)
+            .where(eq(namespacesTable.uuid, context.namespaceUuid))
+            .limit(1)) ?? [];
 
-        if (results.length === 0) {
-          return {
-            content: [
-              {
-                type: "text",
-                text: JSON.stringify({
-                  message: "No tools found matching your query",
-                  query: query,
-                  suggestion: "Try a different search term or be more specific about what you want to accomplish.",
-                }),
-              },
-            ],
-          };
+        let agent =
+          ns?.ask_agent_uuid
+            ? await namespaceAgentsRepository.getByUuid(ns.ask_agent_uuid)
+            : null;
+
+        if (!agent) {
+          agent =
+            (await namespaceAgentsRepository.getFirstByNamespaceAndType(
+              context.namespaceUuid,
+              "ask",
+            )) ??
+            (await namespaceAgentsRepository.create({
+              namespace_uuid: context.namespaceUuid,
+              name: "Default Ask Agent",
+              agent_type: "ask",
+            }));
         }
 
-        // Add found tools to session
-        const foundToolNames = results.map(r => r.tool.name);
-        sessionManager.setTools(context.sessionId, context.namespaceUuid, foundToolNames);
-
-        // Format results as tool definitions
-        const toolDefinitions = results.map((result) => ({
-          name: result.tool.name,
-          description: result.tool.description,
-          relevanceScore: Math.round(result.score * 100) / 100,
-          arguments: result.tool.inputSchema || {},
+        const docs = await namespaceAgentDocumentsRepository.listByAgent(agent.uuid);
+        const ragDocs = docs.map((d) => ({
+          uuid: d.uuid,
+          filename: d.filename,
+          mime: d.mime,
+          content: d.content,
         }));
+
+        const askAgent = new AskAgent({
+          llm: new OpenAiLlmAdapter({ apiKey }),
+          search: new DiscoveryToolSearch(),
+          exec: {
+            callTool: async (fullToolName, toolArgs) => {
+              const res = await handler(
+                {
+                  ...request,
+                  params: {
+                    ...request.params,
+                    name: fullToolName,
+                    arguments: toolArgs,
+                  },
+                },
+                context,
+              );
+              return res.content;
+            },
+          },
+          expose: {
+            setExposedTools: (sessionId, namespaceUuid, toolNames) => {
+              sessionManager.setTools(sessionId, namespaceUuid, toolNames);
+            },
+          },
+        });
+
+        const result = await askAgent.run(
+          {
+            namespaceUuid: context.namespaceUuid,
+            sessionId: context.sessionId,
+            namespaceDescription: status.description,
+          },
+          {
+            enabled: (agent?.enabled as boolean) ?? true,
+            model: (agent?.model as string) || "gpt-4o-mini",
+            systemPrompt:
+              (agent?.system_prompt as string) ||
+              "You are a specialized assistant for a tool namespace. Be concise, safe, and actionable.",
+            references: {
+              ...(((agent?.references as Record<string, unknown>) ?? {}) as Record<
+                string,
+                unknown
+              >),
+              ragDocuments: ragDocs,
+            },
+            allowedTools: (agent?.allowed_tools as string[]) ?? [],
+            deniedTools: (agent?.denied_tools as string[]) ?? [],
+            maxToolCalls: (agent?.max_tool_calls as number) ?? 3,
+            exposeLimit: (agent?.expose_limit as number) ?? 5,
+          },
+          {
+            query,
+            maxToolCalls:
+              typeof args?.maxToolCalls === "number"
+                ? args.maxToolCalls
+                : ((agent?.max_tool_calls as number) ?? 3),
+            exposeLimit:
+              typeof args?.exposeLimit === "number"
+                ? args.exposeLimit
+                : ((agent?.expose_limit as number) ?? 5),
+          },
+        );
 
         return {
           content: [
             {
               type: "text",
-              text: JSON.stringify({
-                message: `Found ${results.length} tool(s) matching your query`,
-                query: query,
-                tools: toolDefinitions,
-                usage: "These tools have been added to your session. You can now call them directly.",
-              }, null, 2),
+              text: JSON.stringify(
+                {
+                  answer: result.answer,
+                  toolCallsExecuted: result.toolCallsExecuted,
+                  suggestedTools: result.suggestedTools ?? [],
+                  exposedTools: result.exposedTools,
+                  followups: result.followups,
+                  usage: result.usage,
+                  tokenUsage: result.tokenUsage,
+                },
+                null,
+                2,
+              ),
             },
           ],
         };
       } catch (error) {
-        console.error(`[SmartDiscovery] Error searching tools:`, error);
+        console.error(`[SmartDiscovery] Error running ask agent:`, error);
         return {
           content: [
             {
               type: "text",
               text: JSON.stringify({
-                error: "Failed to search for tools",
-                message: error instanceof Error ? error.message : "Unknown error occurred",
+                error: "Failed to run ask agent",
+                message:
+                  error instanceof Error ? error.message : "Unknown error occurred",
               }),
             },
           ],

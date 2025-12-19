@@ -19,6 +19,7 @@ export class NamespacesSerializer {
       smart_discovery_enabled: dbNamespace.smart_discovery_enabled,
       smart_discovery_description: dbNamespace.smart_discovery_description,
       smart_discovery_pinned_tools: (dbNamespace.smart_discovery_pinned_tools as string[]) || [],
+      ask_agent_uuid: (dbNamespace as any).ask_agent_uuid ?? null,
     };
   }
 
@@ -41,6 +42,7 @@ export class NamespacesSerializer {
       smart_discovery_enabled: dbNamespace.smart_discovery_enabled,
       smart_discovery_description: dbNamespace.smart_discovery_description,
       smart_discovery_pinned_tools: (dbNamespace.smart_discovery_pinned_tools as string[]) || [],
+      ask_agent_uuid: (dbNamespace as any).ask_agent_uuid ?? null,
       servers: dbNamespace.servers.map((server) => ({
         uuid: server.uuid,
         name: server.name,

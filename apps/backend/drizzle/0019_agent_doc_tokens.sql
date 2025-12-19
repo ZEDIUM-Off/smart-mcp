@@ -1,0 +1,1 @@
+ALTER TABLE "namespace_agent_documents" ADD COLUMN "token_count" integer DEFAULT 0 NOT NULL;

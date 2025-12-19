@@ -7,6 +7,12 @@ echo "📁 Working directory: $(pwd)"
 echo "🔍 Node version: $(node --version)"
 echo "📦 pnpm version: $(pnpm --version)"
 
+# Ensure devDependencies are installed and tools like `dotenv` are available.
+# Some environments set NODE_ENV=production in containers, which would skip devDependencies.
+export NODE_ENV=development
+# Disable interactive prompts in CI/container contexts (pnpm install may prompt).
+export CI=1
+
 # Wait for Postgres if compose didn't already gate startup
 if command -v pg_isready >/dev/null 2>&1; then
     echo "⏳ Checking PostgreSQL readiness..."
@@ -36,7 +42,10 @@ cleanup_on_exit() {
     
     # Clean up managed containers
     echo "🛑 SHUTDOWN: Starting container cleanup..."
-    cleanup_managed_containers
+    # In dev mode we don't manage nested containers here; keep this as a no-op if undefined.
+    if type cleanup_managed_containers >/dev/null 2>&1; then
+        cleanup_managed_containers || true
+    fi
     
     echo "🛑 SHUTDOWN: Development services stopped"
     exit 0

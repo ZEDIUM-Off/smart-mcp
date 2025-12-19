@@ -2,6 +2,7 @@
 
 import {
   Activity,
+  Bot,
   FileTerminal,
   Key,
   Link as LinkIcon,
@@ -62,6 +63,11 @@ const getMenuItems = (t: (key: string) => string, locale: SupportedLocale) => [
     title: t("navigation:metamcpNamespaces"),
     url: getLocalizedPath("/namespaces", locale),
     icon: Package,
+  },
+  {
+    title: t("navigation:agents") ?? "Agents",
+    url: getLocalizedPath("/agents", locale),
+    icon: Bot,
   },
   {
     title: t("navigation:metamcpEndpoints"),

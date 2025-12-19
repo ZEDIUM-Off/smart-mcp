@@ -8,3 +8,5 @@ export * from "./oauth.repo";
 export * from "./api-keys.repo";
 export { configRepo } from "./config.repo";
 export * from "./package-installer.repo";
+export * from "./namespace-agents.repo";
+export * from "./namespace-agent-documents.repo";

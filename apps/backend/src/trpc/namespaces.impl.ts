@@ -1,14 +1,36 @@
 import {
   CreateNamespaceRequestSchema,
   CreateNamespaceResponseSchema,
+  CreateNamespaceAgentRequestSchema,
+  CreateNamespaceAgentResponseSchema,
   DeleteNamespaceResponseSchema,
+  DeleteNamespaceAgentRequestSchema,
+  DeleteNamespaceAgentResponseSchema,
+  DeleteNamespaceAgentDocumentRequestSchema,
+  DeleteNamespaceAgentDocumentResponseSchema,
+  GetNamespaceAskAgentConfigRequestSchema,
+  GetNamespaceAskAgentConfigResponseSchema,
+  GetNamespaceAgentRequestSchema,
+  GetNamespaceAgentResponseSchema,
   GetNamespaceResponseSchema,
   GetNamespaceToolsRequestSchema,
   GetNamespaceToolsResponseSchema,
+  ListNamespaceAgentsRequestSchema,
+  ListNamespaceAgentsResponseSchema,
+  ListNamespaceAgentDocumentsRequestSchema,
+  ListNamespaceAgentDocumentsResponseSchema,
   ListNamespacesResponseSchema,
   McpServer,
   RefreshNamespaceToolsRequestSchema,
   RefreshNamespaceToolsResponseSchema,
+  SetActiveAskAgentRequestSchema,
+  SetActiveAskAgentResponseSchema,
+  UploadNamespaceAgentDocumentRequestSchema,
+  UploadNamespaceAgentDocumentResponseSchema,
+  UpdateNamespaceAskAgentConfigRequestSchema,
+  UpdateNamespaceAskAgentConfigResponseSchema,
+  UpdateNamespaceAgentRequestSchema,
+  UpdateNamespaceAgentResponseSchema,
   UpdateNamespaceRequestSchema,
   UpdateNamespaceResponseSchema,
   UpdateNamespaceServerStatusRequestSchema,
@@ -22,6 +44,8 @@ import { z } from "zod";
 
 import {
   mcpServersRepository,
+  namespaceAgentDocumentsRepository,
+  namespaceAgentsRepository,
   namespaceMappingsRepository,
   namespacesRepository,
   toolsRepository,
@@ -34,6 +58,39 @@ import {
 import { clearSmartDiscoveryCache } from "../lib/metamcp/metamcp-middleware/smart-discovery.functional";
 import { metaMcpServerPool } from "../lib/metamcp/metamcp-server-pool";
 import { parseToolName } from "../lib/metamcp/tool-name-parser";
+import { tokenCounter } from "../lib/tokens/token-counter";
+
+const serializeNamespaceAgent = (row: any) => {
+  return {
+    uuid: row.uuid,
+    namespace_uuid: row.namespace_uuid,
+    agent_type: row.agent_type,
+    name: row.name ?? "Default Ask Agent",
+    enabled: row.enabled,
+    model: row.model,
+    system_prompt: row.system_prompt,
+    references: row.references ?? {},
+    allowed_tools: row.allowed_tools ?? [],
+    denied_tools: row.denied_tools ?? [],
+    max_tool_calls: row.max_tool_calls,
+    expose_limit: row.expose_limit,
+    created_at: row.created_at?.toISOString?.() ?? String(row.created_at),
+    updated_at: row.updated_at?.toISOString?.() ?? String(row.updated_at),
+  };
+};
+
+const serializeAgentDoc = (row: any) => {
+  return {
+    uuid: row.uuid,
+    agent_uuid: row.agent_uuid,
+    filename: row.filename,
+    mime: row.mime,
+    token_count: row.token_count ?? 0,
+    content: row.content,
+    created_at: row.created_at?.toISOString?.() ?? String(row.created_at),
+    updated_at: row.updated_at?.toISOString?.() ?? String(row.updated_at),
+  };
+};
 
 export const namespacesImplementations = {
   create: async (
@@ -49,13 +106,13 @@ export const namespacesImplementations = {
       // Validate server accessibility and relationship rules
       if (input.mcpServerUuids && input.mcpServerUuids.length > 0) {
         // Get detailed server information to validate access and ownership
-        const serverPromises = input.mcpServerUuids.map((uuid) =>
+        const serverPromises = input.mcpServerUuids.map((uuid: string) =>
           mcpServersRepository.findByUuid(uuid),
         );
         const servers = await Promise.all(serverPromises);
 
         // Check if any servers don't exist
-        const missingServers = servers.some((server: McpServer) => !server);
+        const missingServers = servers.some((server) => !server);
         if (missingServers) {
           return {
             success: false as const,
@@ -64,7 +121,7 @@ export const namespacesImplementations = {
         }
 
         // Validate access and relationship rules
-        for (const server of servers) {
+        for (const server of servers as Array<McpServer | undefined>) {
           if (!server) continue;
 
           // Check if user has access to this server (own server or public server)
@@ -347,13 +404,13 @@ export const namespacesImplementations = {
       // Validate server accessibility and relationship rules if servers are being updated
       if (input.mcpServerUuids && input.mcpServerUuids.length > 0) {
         // Get detailed server information to validate access and ownership
-        const serverPromises = input.mcpServerUuids.map((uuid) =>
+        const serverPromises = input.mcpServerUuids.map((uuid: string) =>
           mcpServersRepository.findByUuid(uuid),
         );
         const servers = await Promise.all(serverPromises);
 
         // Check if any servers don't exist
-        const missingServers = servers.some((server: McpServer) => !server);
+        const missingServers = servers.some((server) => !server);
         if (missingServers) {
           return {
             success: false as const,
@@ -362,7 +419,7 @@ export const namespacesImplementations = {
         }
 
         // Validate access and relationship rules
-        for (const server of servers) {
+        for (const server of servers as Array<McpServer | undefined>) {
           if (!server) continue;
 
           // Check if user has access to this server (own server or public server)
@@ -448,6 +505,489 @@ export const namespacesImplementations = {
       };
     } catch (error) {
       console.error("Error updating namespace:", error);
+      return {
+        success: false as const,
+        message:
+          error instanceof Error ? error.message : "Internal server error",
+      };
+    }
+  },
+
+  getAgent: async (
+    input: z.infer<typeof GetNamespaceAgentRequestSchema>,
+    userId: string,
+  ): Promise<z.infer<typeof GetNamespaceAgentResponseSchema>> => {
+    try {
+      const agent = await namespaceAgentsRepository.getByUuid(input.agentUuid);
+      if (!agent) {
+        return { success: false as const, message: "Agent not found" };
+      }
+
+      const namespace = await namespacesRepository.findByUuid(agent.namespace_uuid);
+      if (!namespace) {
+        return { success: false as const, message: "Namespace not found" };
+      }
+
+      if (namespace.user_id && namespace.user_id !== userId) {
+        return {
+          success: false as const,
+          message:
+            "Access denied: You can only view agents for namespaces you own or public namespaces",
+        };
+      }
+
+      return {
+        success: true as const,
+        data: serializeNamespaceAgent(agent) as any,
+        message: "Agent retrieved successfully",
+      };
+    } catch (error) {
+      console.error("Error fetching agent:", error);
+      return {
+        success: false as const,
+        message:
+          error instanceof Error ? error.message : "Internal server error",
+      };
+    }
+  },
+
+  listAgents: async (
+    input: z.infer<typeof ListNamespaceAgentsRequestSchema>,
+    userId: string,
+  ): Promise<z.infer<typeof ListNamespaceAgentsResponseSchema>> => {
+    try {
+      const namespace = await namespacesRepository.findByUuid(input.namespaceUuid);
+      if (!namespace) {
+        return { success: false as const, message: "Namespace not found" };
+      }
+      if (namespace.user_id && namespace.user_id !== userId) {
+        return {
+          success: false as const,
+          message:
+            "Access denied: You can only view agents for namespaces you own or public namespaces",
+        };
+      }
+
+      const agents = await namespaceAgentsRepository.listByNamespace(
+        input.namespaceUuid,
+      );
+
+      return {
+        success: true as const,
+        data: agents.map(serializeNamespaceAgent),
+        message: "Agents retrieved successfully",
+      };
+    } catch (error) {
+      console.error("Error listing agents:", error);
+      return {
+        success: false as const,
+        message:
+          error instanceof Error ? error.message : "Internal server error",
+      };
+    }
+  },
+
+  createAgent: async (
+    input: z.infer<typeof CreateNamespaceAgentRequestSchema>,
+    userId: string,
+  ): Promise<z.infer<typeof CreateNamespaceAgentResponseSchema>> => {
+    try {
+      const namespace = await namespacesRepository.findByUuid(input.namespaceUuid);
+      if (!namespace) {
+        return { success: false as const, message: "Namespace not found" };
+      }
+      if (!namespace.user_id || namespace.user_id !== userId) {
+        return {
+          success: false as const,
+          message: "Access denied: You can only create agents for namespaces you own",
+        };
+      }
+
+      const agent = await namespaceAgentsRepository.create({
+        namespace_uuid: input.namespaceUuid,
+        name: input.name,
+        agent_type: "ask",
+        enabled: input.enabled,
+        model: input.model,
+        system_prompt: input.system_prompt,
+        references: input.references,
+        denied_tools: input.denied_tools,
+        max_tool_calls: input.max_tool_calls,
+        expose_limit: input.expose_limit,
+      } as any);
+
+      return {
+        success: true as const,
+        data: serializeNamespaceAgent(agent),
+        message: "Agent created successfully",
+      };
+    } catch (error) {
+      console.error("Error creating agent:", error);
+      return {
+        success: false as const,
+        message:
+          error instanceof Error ? error.message : "Internal server error",
+      };
+    }
+  },
+
+  updateAgent: async (
+    input: z.infer<typeof UpdateNamespaceAgentRequestSchema>,
+    userId: string,
+  ): Promise<z.infer<typeof UpdateNamespaceAgentResponseSchema>> => {
+    try {
+      const existing = await namespaceAgentsRepository.getByUuid(input.agentUuid);
+      if (!existing) {
+        return { success: false as const, message: "Agent not found" };
+      }
+
+      const namespace = await namespacesRepository.findByUuid(existing.namespace_uuid);
+      if (!namespace) {
+        return { success: false as const, message: "Namespace not found" };
+      }
+      if (!namespace.user_id || namespace.user_id !== userId) {
+        return {
+          success: false as const,
+          message: "Access denied: You can only update agents for namespaces you own",
+        };
+      }
+
+      const updated = await namespaceAgentsRepository.update({
+        uuid: input.agentUuid,
+        name: input.name,
+        enabled: input.enabled,
+        model: input.model,
+        system_prompt: input.system_prompt,
+        references: input.references,
+        denied_tools: input.denied_tools,
+        max_tool_calls: input.max_tool_calls,
+        expose_limit: input.expose_limit,
+      } as any);
+
+      return {
+        success: true as const,
+        data: serializeNamespaceAgent(updated),
+        message: "Agent updated successfully",
+      };
+    } catch (error) {
+      console.error("Error updating agent:", error);
+      return {
+        success: false as const,
+        message:
+          error instanceof Error ? error.message : "Internal server error",
+      };
+    }
+  },
+
+  deleteAgent: async (
+    input: z.infer<typeof DeleteNamespaceAgentRequestSchema>,
+    userId: string,
+  ): Promise<z.infer<typeof DeleteNamespaceAgentResponseSchema>> => {
+    try {
+      const existing = await namespaceAgentsRepository.getByUuid(input.agentUuid);
+      if (!existing) {
+        return { success: false as const, message: "Agent not found" };
+      }
+      const namespace = await namespacesRepository.findByUuid(existing.namespace_uuid);
+      if (!namespace) {
+        return { success: false as const, message: "Namespace not found" };
+      }
+      if (!namespace.user_id || namespace.user_id !== userId) {
+        return {
+          success: false as const,
+          message: "Access denied: You can only delete agents for namespaces you own",
+        };
+      }
+
+      // If the deleted agent is currently selected, clear it
+      if ((namespace as any).ask_agent_uuid === input.agentUuid) {
+        await namespacesRepository.update({
+          uuid: namespace.uuid,
+          name: namespace.name,
+          description: namespace.description,
+          user_id: namespace.user_id,
+          ask_agent_uuid: null,
+        } as any);
+      }
+
+      await namespaceAgentsRepository.delete(input.agentUuid);
+
+      return { success: true as const, message: "Agent deleted successfully" };
+    } catch (error) {
+      console.error("Error deleting agent:", error);
+      return {
+        success: false as const,
+        message:
+          error instanceof Error ? error.message : "Internal server error",
+      };
+    }
+  },
+
+  setActiveAskAgent: async (
+    input: z.infer<typeof SetActiveAskAgentRequestSchema>,
+    userId: string,
+  ): Promise<z.infer<typeof SetActiveAskAgentResponseSchema>> => {
+    try {
+      const namespace = await namespacesRepository.findByUuid(input.namespaceUuid);
+      if (!namespace) {
+        return { success: false as const, message: "Namespace not found" };
+      }
+      if (!namespace.user_id || namespace.user_id !== userId) {
+        return {
+          success: false as const,
+          message: "Access denied: You can only update namespaces you own",
+        };
+      }
+
+      if (input.agentUuid) {
+        const agent = await namespaceAgentsRepository.getByUuid(input.agentUuid);
+        if (!agent || agent.namespace_uuid !== input.namespaceUuid) {
+          return {
+            success: false as const,
+            message: "Agent not found for this namespace",
+          };
+        }
+      }
+
+      await namespacesRepository.update({
+        uuid: namespace.uuid,
+        name: namespace.name,
+        description: namespace.description,
+        user_id: namespace.user_id,
+        ask_agent_uuid: input.agentUuid,
+      } as any);
+
+      return { success: true as const, message: "Active ask agent updated" };
+    } catch (error) {
+      console.error("Error setting active ask agent:", error);
+      return {
+        success: false as const,
+        message:
+          error instanceof Error ? error.message : "Internal server error",
+      };
+    }
+  },
+
+  listAgentDocuments: async (
+    input: z.infer<typeof ListNamespaceAgentDocumentsRequestSchema>,
+    userId: string,
+  ): Promise<z.infer<typeof ListNamespaceAgentDocumentsResponseSchema>> => {
+    try {
+      const agent = await namespaceAgentsRepository.getByUuid(input.agentUuid);
+      if (!agent) {
+        return { success: false as const, message: "Agent not found" };
+      }
+      const namespace = await namespacesRepository.findByUuid(agent.namespace_uuid);
+      if (!namespace) {
+        return { success: false as const, message: "Namespace not found" };
+      }
+      if (!namespace.user_id || namespace.user_id !== userId) {
+        return {
+          success: false as const,
+          message: "Access denied: You can only view docs for agents you own",
+        };
+      }
+
+      const docs = await namespaceAgentDocumentsRepository.listByAgent(
+        input.agentUuid,
+      );
+      return {
+        success: true as const,
+        data: docs.map(serializeAgentDoc),
+        message: "Documents retrieved successfully",
+      };
+    } catch (error) {
+      console.error("Error listing agent documents:", error);
+      return {
+        success: false as const,
+        message:
+          error instanceof Error ? error.message : "Internal server error",
+      };
+    }
+  },
+
+  uploadAgentDocument: async (
+    input: z.infer<typeof UploadNamespaceAgentDocumentRequestSchema>,
+    userId: string,
+  ): Promise<z.infer<typeof UploadNamespaceAgentDocumentResponseSchema>> => {
+    try {
+      const agent = await namespaceAgentsRepository.getByUuid(input.agentUuid);
+      if (!agent) {
+        return { success: false as const, message: "Agent not found" };
+      }
+      const namespace = await namespacesRepository.findByUuid(agent.namespace_uuid);
+      if (!namespace) {
+        return { success: false as const, message: "Namespace not found" };
+      }
+      if (!namespace.user_id || namespace.user_id !== userId) {
+        return {
+          success: false as const,
+          message: "Access denied: You can only upload docs for agents you own",
+        };
+      }
+
+      // Enforce token budget (sum docs + new doc) <= 200k
+      const existingDocs = await namespaceAgentDocumentsRepository.listByAgent(
+        input.agentUuid,
+      );
+      const model = agent.model || "gpt-4o-mini";
+      const existingTokens = existingDocs.reduce(
+        (sum, d) => sum + ((d as any).token_count ?? 0),
+        0,
+      );
+      const newTokens = tokenCounter.count(model, input.content);
+      const limit = 200_000;
+      if (existingTokens + newTokens > limit) {
+        return {
+          success: false as const,
+          message: `Token budget exceeded for agent docs: ${existingTokens + newTokens}/${limit} tokens`,
+        };
+      }
+
+      const doc = await namespaceAgentDocumentsRepository.addDoc({
+        agent_uuid: input.agentUuid,
+        filename: input.filename,
+        mime: input.mime,
+        content: input.content,
+        token_model: model,
+      });
+
+      return {
+        success: true as const,
+        data: serializeAgentDoc(doc) as any,
+        message: "Document uploaded successfully",
+      };
+    } catch (error) {
+      console.error("Error uploading agent document:", error);
+      return {
+        success: false as const,
+        message:
+          error instanceof Error ? error.message : "Internal server error",
+      };
+    }
+  },
+
+  deleteAgentDocument: async (
+    input: z.infer<typeof DeleteNamespaceAgentDocumentRequestSchema>,
+    userId: string,
+  ): Promise<z.infer<typeof DeleteNamespaceAgentDocumentResponseSchema>> => {
+    try {
+      // We don't have doc->agent query in repo; simplest MVP: just delete (FK cascade ensures ownership via UI)
+      // Safer: require ownership by joining doc->agent->namespace. We'll add that now.
+      const doc = await namespaceAgentDocumentsRepository.getByUuid(input.docUuid);
+      if (!doc) {
+        return { success: false as const, message: "Document not found" };
+      }
+      const agent = await namespaceAgentsRepository.getByUuid(doc.agent_uuid);
+      if (!agent) {
+        return { success: false as const, message: "Agent not found" };
+      }
+      const namespace = await namespacesRepository.findByUuid(agent.namespace_uuid);
+      if (!namespace) {
+        return { success: false as const, message: "Namespace not found" };
+      }
+      if (!namespace.user_id || namespace.user_id !== userId) {
+        return {
+          success: false as const,
+          message: "Access denied: You can only delete docs for agents you own",
+        };
+      }
+
+      await namespaceAgentDocumentsRepository.delete(input.docUuid);
+      return { success: true as const, message: "Document deleted successfully" };
+    } catch (error) {
+      console.error("Error deleting agent document:", error);
+      return {
+        success: false as const,
+        message:
+          error instanceof Error ? error.message : "Internal server error",
+      };
+    }
+  },
+
+  getAskAgentConfig: async (
+    input: z.infer<typeof GetNamespaceAskAgentConfigRequestSchema>,
+    userId: string,
+  ): Promise<z.infer<typeof GetNamespaceAskAgentConfigResponseSchema>> => {
+    try {
+      const namespace = await namespacesRepository.findByUuid(input.namespaceUuid);
+      if (!namespace) {
+        return { success: false as const, message: "Namespace not found" };
+      }
+
+      // Match existing access model: allow access to public or owned namespaces
+      if (namespace.user_id && namespace.user_id !== userId) {
+        return {
+          success: false as const,
+          message:
+            "Access denied: You can only view agent config for namespaces you own or public namespaces",
+        };
+      }
+
+      const row =
+        (await namespaceAgentsRepository.getByNamespaceAndType(
+          input.namespaceUuid,
+          "ask",
+        )) ??
+        (await namespaceAgentsRepository.upsert({
+          namespace_uuid: input.namespaceUuid,
+          agent_type: "ask",
+        }));
+
+      return {
+        success: true as const,
+        data: serializeNamespaceAgent(row),
+        message: "Ask agent config retrieved successfully",
+      };
+    } catch (error) {
+      console.error("Error fetching ask agent config:", error);
+      return {
+        success: false as const,
+        message:
+          error instanceof Error ? error.message : "Internal server error",
+      };
+    }
+  },
+
+  updateAskAgentConfig: async (
+    input: z.infer<typeof UpdateNamespaceAskAgentConfigRequestSchema>,
+    userId: string,
+  ): Promise<z.infer<typeof UpdateNamespaceAskAgentConfigResponseSchema>> => {
+    try {
+      const namespace = await namespacesRepository.findByUuid(input.namespaceUuid);
+      if (!namespace) {
+        return { success: false as const, message: "Namespace not found" };
+      }
+
+      // Match existing access model: allow updates to public or owned namespaces
+      if (namespace.user_id && namespace.user_id !== userId) {
+        return {
+          success: false as const,
+          message:
+            "Access denied: You can only update agent config for namespaces you own",
+        };
+      }
+
+      const row = await namespaceAgentsRepository.upsert({
+        namespace_uuid: input.namespaceUuid,
+        agent_type: "ask",
+        enabled: input.enabled,
+        model: input.model,
+        system_prompt: input.system_prompt,
+        references: input.references,
+        allowed_tools: input.allowed_tools,
+        denied_tools: input.denied_tools,
+        max_tool_calls: input.max_tool_calls,
+        expose_limit: input.expose_limit,
+      });
+
+      return {
+        success: true as const,
+        data: serializeNamespaceAgent(row),
+        message: "Ask agent config updated successfully",
+      };
+    } catch (error) {
+      console.error("Error updating ask agent config:", error);
       return {
         success: false as const,
         message:
@@ -789,7 +1329,7 @@ export const namespacesImplementations = {
       // Log available servers for debugging
       console.log(
         `[refreshTools] Namespace "${input.namespaceUuid}" has ${namespaceWithServers.servers.length} server(s):`,
-        namespaceWithServers.servers.map((s: McpServer) => s.name).join(", "),
+        namespaceWithServers.servers.map((s) => s.name).join(", "),
       );
       console.log(
         `[refreshTools] Parsed ${parsedTools.length} tool(s) from input:`,

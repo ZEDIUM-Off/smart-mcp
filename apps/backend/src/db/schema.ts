@@ -8,6 +8,7 @@ import {
 import { sql } from "drizzle-orm";
 import {
   boolean,
+  integer,
   index,
   jsonb,
   pgEnum,
@@ -229,6 +230,9 @@ export const namespacesTable = pgTable(
     // Pinned tools that are always loaded when smart discovery is enabled
     // Array of full tool names (e.g., ["ServerName__toolName", ...])
     smart_discovery_pinned_tools: jsonb("smart_discovery_pinned_tools").$type<string[]>().default([]),
+    // Active ask agent for this namespace (optional)
+    // NOTE: FK is enforced at the SQL migration level to avoid TS circular refs
+    ask_agent_uuid: uuid("ask_agent_uuid"),
     created_at: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -246,6 +250,70 @@ export const namespacesTable = pgTable(
     sql`CONSTRAINT namespaces_name_regex_check CHECK (
         name ~ '^[a-zA-Z0-9_-]+$'
       )`,
+  ],
+);
+
+// Namespace Agents table - configurable agents (e.g. metamcp__ask) per namespace
+export const namespaceAgentsTable = pgTable(
+  "namespace_agents",
+  {
+    uuid: uuid("uuid").primaryKey().defaultRandom(),
+    namespace_uuid: uuid("namespace_uuid")
+      .notNull()
+      .references(() => namespacesTable.uuid, { onDelete: "cascade" }),
+    name: text("name").notNull().default("Default Ask Agent"),
+    // Agent type identifier (MVP: "ask")
+    agent_type: text("agent_type").notNull(),
+    enabled: boolean("enabled").notNull().default(true),
+    // OpenAI model name, e.g. "gpt-4o-mini"
+    model: text("model").notNull().default("gpt-4o-mini"),
+    // System prompt / instructions for the agent
+    system_prompt: text("system_prompt").notNull().default(""),
+    // Optional context/references the agent can use (RAG pointers, snippets, etc.)
+    references: jsonb("references")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+    // Allow/deny tool execution lists (full tool names like Server__tool)
+    allowed_tools: jsonb("allowed_tools").$type<string[]>().notNull().default([]),
+    denied_tools: jsonb("denied_tools").$type<string[]>().notNull().default([]),
+    max_tool_calls: integer("max_tool_calls").notNull().default(3),
+    expose_limit: integer("expose_limit").notNull().default(5),
+    created_at: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updated_at: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("namespace_agents_namespace_uuid_idx").on(table.namespace_uuid),
+    index("namespace_agents_agent_type_idx").on(table.agent_type),
+    index("namespace_agents_enabled_idx").on(table.enabled),
+  ],
+);
+
+// Agent documents (RAG references) - MVP: store text content in DB
+export const namespaceAgentDocumentsTable = pgTable(
+  "namespace_agent_documents",
+  {
+    uuid: uuid("uuid").primaryKey().defaultRandom(),
+    agent_uuid: uuid("agent_uuid")
+      .notNull()
+      .references(() => namespaceAgentsTable.uuid, { onDelete: "cascade" }),
+    filename: text("filename").notNull(),
+    mime: text("mime").notNull().default("text/plain"),
+    token_count: integer("token_count").notNull().default(0),
+    content: text("content").notNull(),
+    created_at: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updated_at: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("namespace_agent_documents_agent_uuid_idx").on(table.agent_uuid),
   ],
 );
 

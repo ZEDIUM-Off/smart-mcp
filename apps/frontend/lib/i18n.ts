@@ -15,6 +15,7 @@ export type Translations = {
   dashboard: Record<string, any>;
   "mcp-servers": Record<string, any>;
   namespaces: Record<string, any>;
+  agents: Record<string, any>;
   endpoints: Record<string, any>;
   "api-keys": Record<string, any>;
   settings: Record<string, any>;
@@ -64,6 +65,7 @@ export async function loadTranslations(
         .default,
       namespaces: (await import("../public/locales/en/namespaces.json"))
         .default,
+      agents: (await import("../public/locales/en/agents.json")).default,
       endpoints: (await import("../public/locales/en/endpoints.json")).default,
       "api-keys": (await import("../public/locales/en/api-keys.json")).default,
       settings: (await import("../public/locales/en/settings.json")).default,
@@ -82,6 +84,7 @@ export async function loadTranslations(
       dashboardZh,
       mcpServersZh,
       namespacesZh,
+      agentsZh,
       endpointsZh,
       apiKeysZh,
       settingsZh,
@@ -104,6 +107,7 @@ export async function loadTranslations(
       import("../public/locales/zh/namespaces.json").catch(() => ({
         default: {},
       })),
+      import("../public/locales/zh/agents.json").catch(() => ({ default: {} })),
       import("../public/locales/zh/endpoints.json").catch(() => ({
         default: {},
       })),
@@ -133,6 +137,7 @@ export async function loadTranslations(
       dashboard: { ...englishDict.dashboard, ...dashboardZh.default },
       "mcp-servers": { ...englishDict["mcp-servers"], ...mcpServersZh.default },
       namespaces: { ...englishDict.namespaces, ...namespacesZh.default },
+      agents: { ...englishDict.agents, ...agentsZh.default },
       endpoints: { ...englishDict.endpoints, ...endpointsZh.default },
       "api-keys": { ...englishDict["api-keys"], ...apiKeysZh.default },
       settings: { ...englishDict.settings, ...settingsZh.default },
